@@ -11,3 +11,6 @@ build/
 *.log
 .DS_Store
 .vercel
+
+# Downloaded data files (large CSVs)
+scripts/data/
