@@ -7,7 +7,7 @@ normalizes categories, and inserts into the incidents + incident_sources tables.
 Skips rows already in DB (dedup by external_id in incident_sources).
 Skips rows without lat/lng.
 
-Usage: cd scripts && python seed_data.py
+Usage: cd backend/scripts && python seed_data.py
 """
 
 import asyncio
@@ -16,14 +16,15 @@ import os
 import sys
 from datetime import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+# Add backend/ to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 from database import InsForgeClient
-from normalize import normalize_category
+from utils.normalize import normalize_category
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
