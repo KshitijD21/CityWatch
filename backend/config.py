@@ -1,8 +1,12 @@
 import os
 
+# InsForge (BaaS — replaces Supabase)
+INSFORGE_URL = os.getenv("INSFORGE_URL")
+INSFORGE_SERVICE_KEY = os.getenv("INSFORGE_SERVICE_KEY")
+INSFORGE_ANON_KEY = os.getenv("INSFORGE_ANON_KEY")
+
+# External APIs
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
 TINYFISH_API_KEY = os.getenv("TINYFISH_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-DATABASE_URL = os.getenv("DATABASE_URL")
+X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
