@@ -4,7 +4,7 @@ Also downloads police grid centroids from ArcGIS for geocoding.
 
 Skips downloads if files already exist locally.
 
-Usage: cd scripts && python download_data.py
+Usage: cd backend/scripts && python download_data.py
 """
 
 import os

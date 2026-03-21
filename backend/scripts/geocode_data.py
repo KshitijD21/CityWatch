@@ -7,7 +7,7 @@ lat/lng columns. Skips if enriched files already exist.
 For rows where the grid code isn't found in the grid lookup, falls back to
 Mapbox geocoding of the hundred-block address (rate-limited).
 
-Usage: cd scripts && python geocode_data.py
+Usage: cd backend/scripts && python geocode_data.py
 """
 
 import csv
@@ -18,7 +18,7 @@ import time
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
