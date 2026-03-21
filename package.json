@@ -1,0 +1,17 @@
+{
+  "name": "streetsense",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000",
+    "dev": "concurrently \"pnpm dev:frontend\" \"pnpm dev:backend\"",
+    "build": "pnpm --filter frontend build",
+    "lint": "pnpm --filter frontend lint",
+    "seed": "cd scripts && python seed_data.py",
+    "scrape:police": "cd scripts && python scrape_police.py",
+    "scrape:news": "cd scripts && python scrape_news.py"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
