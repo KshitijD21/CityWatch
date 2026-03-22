@@ -8,6 +8,7 @@ import { ReportModal } from '@/components/map/ReportModal';
 import { AlertTriangle } from 'lucide-react';
 import { MemberProfilePanel } from '@/components/map/MemberProfilePanel';
 import { Legend } from '@/components/map/Legend';
+import { AlertsPanel } from '@/components/map/AlertsPanel';
 import { useGroupLocations } from '@/hooks/useGroupLocations';
 import { useAuthContext } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/api';
@@ -26,6 +27,7 @@ export default function MapPage() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberPin | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
   const [sourceFilters, setSourceFilters] = useState<Record<string, boolean>>({
     police: true,
     news: true,
@@ -128,6 +130,8 @@ export default function MapPage() {
             startSharing(groupId, user?.name || 'You');
           }
         }}
+        alertsOpen={showAlerts}
+        onToggleAlerts={() => setShowAlerts(!showAlerts)}
       />
 
       <div className="flex-1 relative">
