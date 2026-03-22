@@ -32,10 +32,14 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * Decode JWT and check if it's expired or within 60s of expiry.
+ * Used to decide whether to use the cached token or call refreshSession().
+ * NOTE: This is NOT validation — backend still verifies the signature on every request.
+ */
 function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    // Expired if less than 60s remaining
     return Date.now() >= (payload.exp * 1000) - 60_000;
   } catch {
     return true;
@@ -49,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: true,
   });
 
+  /** Fetch user profile from backend and update state. Clears token on failure. */
   const fetchUser = useCallback(async (token: string) => {
     try {
       const profile = await apiFetch('/api/auth/me', {
@@ -61,18 +66,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore session on mount
+  /*
+   * Restore session on mount.
+   *
+   * Why we avoid calling refreshSession() when the token is still valid:
+   * InsForge rotates the CSRF token on every successful refresh. If a page reload
+   * interrupts an in-flight refresh, the old CSRF persists in the cookie while
+   * InsForge expects the new one — causing a 403 "Invalid CSRF token" which then
+   * clears the httpOnly refresh cookie entirely.
+   *
+   * By checking the JWT exp claim first, we skip the refresh call on normal page
+   * reloads (token is still valid) and only call refreshSession() when the token
+   * is actually expired (e.g., user was away for >15 min).
+   */
   useEffect(() => {
     async function restoreSession() {
       const saved = localStorage.getItem('token');
 
-      // 1. If token exists and is still valid, use it directly (no refresh call)
+      // 1. Token exists and is still valid — use it directly, no network call needed
       if (saved && !isTokenExpired(saved)) {
         await fetchUser(saved);
         return;
       }
 
-      // 2. Token expired or missing — try SDK refresh via httpOnly cookie
+      // 2. Token expired or missing — try refresh via httpOnly cookie (7-day lifetime)
       const { data } = await insforge.auth
         .refreshSession()
         .catch(() => ({ data: null }));
@@ -82,14 +99,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // 3. Refresh failed — clean up stale token
+      // 3. Refresh also failed — user needs to re-login
       if (saved) localStorage.removeItem('token');
       setState((s) => ({ ...s, loading: false }));
     }
     restoreSession();
   }, [fetchUser]);
 
-  // Keep session alive — refresh token on interval and tab focus
+  /*
+   * Keep session alive while the tab is active.
+   *
+   * - Interval (10 min): proactively refreshes before the 15-min access token expires.
+   *   This keeps localStorage always holding a fresh token, so page reloads never
+   *   need to call refreshSession(). Also keeps the CSRF token in sync since the
+   *   SDK processes the response while the page is alive.
+   *
+   * - Tab focus: only refreshes if the token is expired or nearly expired (e.g., user
+   *   switched away for a while). Avoids unnecessary refresh calls on quick tab switches.
+   */
   useEffect(() => {
     async function refreshToken() {
       const token = localStorage.getItem('token');
@@ -104,12 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Refresh every 10 min while tab is active (well before 15-min expiry)
     const interval = setInterval(refreshToken, 10 * 60 * 1000);
 
     function onFocus() {
       const token = localStorage.getItem('token');
-      // Only refresh on focus if token is expired or close to expiry
       if (token && isTokenExpired(token)) {
         refreshToken();
       }
@@ -122,8 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /** Sign in via InsForge SDK (sets httpOnly refresh cookie + CSRF token). */
   const login = useCallback(async (email: string, password: string) => {
-    // SDK-first: sign in via InsForge SDK (sets httpOnly refresh cookie)
     const { data, error } = await insforge.auth.signInWithPassword({
       email,
       password,
@@ -134,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = data.accessToken;
     localStorage.setItem('token', token);
 
-    // Fetch profile from backend — also handles first-time user row creation
+    // Fetch profile from backend; if not found, create it (first login via SDK)
     try {
       const profile = await apiFetch('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
@@ -159,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Create auth user via InsForge SDK, then create profile row in backend. */
   const signup = useCallback(
     async (
       email: string,
@@ -166,7 +192,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: string,
       ageBand: string = 'adult'
     ) => {
-      // SDK-first: create auth user via InsForge SDK
       const { data, error } = await insforge.auth.signUp({
         email,
         password,
@@ -192,12 +217,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [fetchUser]
   );
 
+  /** Clear local token, revoke InsForge session, and reset state. */
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     insforge.auth.signOut().catch(() => {});
     setState({ user: null, token: null, loading: false });
   }, []);
 
+  /** Re-fetch user profile without re-authenticating (e.g., after onboarding). */
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (token) await fetchUser(token);
