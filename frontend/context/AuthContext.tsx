@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { User } from '@/types';
 import { apiFetch } from '@/lib/api';
-import { insforge } from '@/lib/insforge';
+import { insforgeAuth } from '@/lib/insforge';
 
 interface AuthState {
   user: User | null;
@@ -85,14 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 1. Token exists and is still valid — use it directly, no network call needed
       if (saved && !isTokenExpired(saved)) {
-        console.log('[Auth] Token valid, skipping refreshSession');
         await fetchUser(saved);
         return;
       }
 
       // 2. Token expired or missing — try refresh via httpOnly cookie (7-day lifetime)
-      console.log('[Auth] Token expired/missing, calling refreshSession');
-      const { data } = await insforge.auth
+      const { data } = await insforgeAuth.auth
         .refreshSession()
         .catch(() => ({ data: null }));
       if (data?.accessToken) {
@@ -124,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const { data } = await insforge.auth
+      const { data } = await insforgeAuth.auth
         .refreshSession()
         .catch(() => ({ data: null }));
       if (data?.accessToken) {
@@ -151,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Sign in via InsForge SDK (sets httpOnly refresh cookie + CSRF token). */
   const login = useCallback(async (email: string, password: string) => {
-    const { data, error } = await insforge.auth.signInWithPassword({
+    const { data, error } = await insforgeAuth.auth.signInWithPassword({
       email,
       password,
     });
@@ -194,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: string,
       ageBand: string = 'adult'
     ) => {
-      const { data, error } = await insforge.auth.signUp({
+      const { data, error } = await insforgeAuth.auth.signUp({
         email,
         password,
         name,
@@ -222,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Clear local token, revoke InsForge session, and reset state. */
   const logout = useCallback(() => {
     localStorage.removeItem('token');
-    insforge.auth.signOut().catch(() => {});
+    insforgeAuth.auth.signOut().catch(() => {});
     setState({ user: null, token: null, loading: false });
   }, []);
 
