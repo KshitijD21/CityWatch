@@ -1,10 +1,20 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="CityWatch API", version="0.1.0")
+from services.insforge_service import insforge
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await insforge.close()
+
+
+app = FastAPI(title="CityWatch API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -39,7 +39,7 @@ class LocationUpdate(BaseModel):
 
 class GroupCreate(BaseModel):
     name: str
-    type: str  # "family" or "trip"
+    type: str  # "family" or "friends"
 
 class PlaceCreate(BaseModel):
     name: str
@@ -51,3 +51,43 @@ class SignupRequest(BaseModel):
     password: str
     name: str
     age_band: str
+
+
+class LoginRequest(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    google_token: Optional[str] = None
+
+    @model_validator(mode="after")
+    def check_credentials(self):
+        has_email_pw = self.email is not None and self.password is not None
+        has_google = self.google_token is not None
+        if not has_email_pw and not has_google:
+            raise ValueError("Provide email+password or google_token")
+        if has_email_pw and has_google:
+            raise ValueError("Provide email+password or google_token, not both")
+        return self
+
+
+class AuthResponse(BaseModel):
+    user_id: str
+    token: str
+    onboarded: bool
+
+
+class UserProfile(BaseModel):
+    id: str
+    email: str
+    name: str
+    age_band: str
+    avatar_url: Optional[str] = None
+    onboarded: bool
+    notification_prefs: dict
+    groups: list
+    saved_places: list
+
+
+class UserUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    age_band: Optional[str] = None
+    notification_prefs: Optional[dict] = None

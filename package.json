@@ -7,6 +7,7 @@
     "dev": "concurrently \"pnpm dev:frontend\" \"pnpm dev:backend\"",
     "build": "pnpm --filter frontend build",
     "lint": "pnpm --filter frontend lint",
+    "migrate": "cd scripts && python3 migrate.py",
     "seed": "cd scripts && python seed_data.py",
     "scrape:police": "cd scripts && python scrape_police.py",
     "scrape:news": "cd scripts && python scrape_news.py"
