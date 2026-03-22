@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/context/AuthContext";
@@ -10,13 +10,21 @@ import { Shield, Loader2 } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signup } = useAuthContext();
+  const { user, loading: authLoading, signup } = useAuthContext();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Redirect to map if already logged in
+  useEffect(() => {
+    if (!authLoading && user) router.replace("/map");
+  }, [user, authLoading, router]);
+
+  // Don't flash the signup form while checking auth
+  if (authLoading || user) return <div className="min-h-dvh bg-[#08080d]" />;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

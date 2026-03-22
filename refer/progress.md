@@ -1,5 +1,12 @@
 # Progress Log
 
+## 2026-03-22 — Fix: redirect logged-in users away from login/signup pages
+
+### Files Changed
+
+- `frontend/app/login/page.tsx` — added auth guard: redirects to `/map` if user is already logged in
+- `frontend/app/signup/page.tsx` — same auth guard
+
 ## 2026-03-22 — Fix: skip onboarding for users already in a group
 
 ### Files Changed
