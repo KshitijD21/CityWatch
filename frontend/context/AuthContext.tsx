@@ -69,27 +69,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /*
    * Restore session on mount.
    *
-   * Why we avoid calling refreshSession() when the token is still valid:
-   * InsForge rotates the CSRF token on every successful refresh. If a page reload
-   * interrupts an in-flight refresh, the old CSRF persists in the cookie while
-   * InsForge expects the new one — causing a 403 "Invalid CSRF token" which then
-   * clears the httpOnly refresh cookie entirely.
-   *
-   * By checking the JWT exp claim first, we skip the refresh call on normal page
-   * reloads (token is still valid) and only call refreshSession() when the token
-   * is actually expired (e.g., user was away for >15 min).
+   * Always calls refreshSession() via the same-origin proxy (insforgeAuth) to
+   * renew the httpOnly refresh cookie on every page load. This is necessary
+   * because Chrome drops cookies that aren't actively renewed, even first-party
+   * ones set through a proxy. The localStorage token is used as an immediate
+   * fallback so the UI doesn't flash while the refresh call is in flight.
    */
   useEffect(() => {
     async function restoreSession() {
       const saved = localStorage.getItem('token');
 
-      // 1. Token exists and is still valid — use it directly, no network call needed
+      // Show user immediately if we have a valid cached token (avoids flash)
       if (saved && !isTokenExpired(saved)) {
         await fetchUser(saved);
-        return;
       }
 
-      // 2. Token expired or missing — try refresh via httpOnly cookie (7-day lifetime)
+      // Always attempt refresh to renew the httpOnly cookie
       const { data } = await insforgeAuth.auth
         .refreshSession()
         .catch(() => ({ data: null }));
@@ -99,9 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // 3. Refresh also failed — user needs to re-login
-      if (saved) localStorage.removeItem('token');
-      setState((s) => ({ ...s, loading: false }));
+      // Refresh failed — if we had no valid cached token, user needs to re-login
+      if (!saved || isTokenExpired(saved)) {
+        if (saved) localStorage.removeItem('token');
+        setState((s) => ({ ...s, loading: false }));
+      }
     }
     restoreSession();
   }, [fetchUser]);
