@@ -3,6 +3,6 @@ builder = "nixpacks"
 buildCommand = "pip install -r backend/requirements.txt"
 
 [deploy]
-startCommand = "sh -c 'ls / && ls /app/ 2>/dev/null && ls /opt/ 2>/dev/null && pwd && ls'"
+startCommand = "sh -c 'find / -name main.py -maxdepth 4 2>/dev/null; echo PWD=$(pwd); ls -la; ls backend/ 2>/dev/null; sleep 30'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
