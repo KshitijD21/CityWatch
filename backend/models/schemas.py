@@ -29,7 +29,8 @@ class BriefResponse(BaseModel):
 
 class ReportCreate(BaseModel):
     category: str
-    description: Optional[str]
+    description: Optional[str] = None
+    image_url: Optional[str] = None
     lat: float
     lng: float
 

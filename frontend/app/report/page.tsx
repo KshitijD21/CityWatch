@@ -3,7 +3,8 @@
 import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Loader2, CheckCircle, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Loader2, CheckCircle, Navigation, Camera, X } from "lucide-react";
+import { insforge } from "@/lib/insforge";
 import { Button } from "@/components/ui/button";
 import { AddressInput } from "@/components/onboarding/AddressInput";
 import { apiFetch } from "@/lib/api";
@@ -39,6 +40,8 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Auto-fetch current location address on mount
   useEffect(() => {
@@ -91,17 +94,46 @@ export default function ReportPage() {
     );
   }
 
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5 MB");
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!category || !location) return;
     setLoading(true);
 
     try {
+      // Upload image if attached
+      let imageUrl: string | undefined;
+      if (imageFile) {
+        const { data, error } = await insforge.storage
+          .from("report-images")
+          .upload(`reports/${Date.now()}-${imageFile.name}`, imageFile);
+        if (data && !error) {
+          imageUrl = data.url;
+        }
+      }
+
       await apiFetch("/api/reports", {
         method: "POST",
         body: JSON.stringify({
           category,
           description: description.trim() || undefined,
+          image_url: imageUrl,
           lat: location.lat,
           lng: location.lng,
         }),
@@ -217,6 +249,41 @@ export default function ReportPage() {
             rows={3}
             className="w-full rounded-xl bg-white/[0.03] border border-white/[0.08] px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#4d7fff]/50 resize-none"
           />
+        </div>
+
+        {/* Photo */}
+        <div>
+          <label className="text-sm font-medium text-white/70 block mb-2">
+            Photo (optional)
+          </label>
+          {imagePreview ? (
+            <div className="relative inline-block">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="h-28 rounded-xl border border-white/[0.08] object-cover"
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute -top-2 -right-2 size-6 rounded-full bg-red-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="size-3 text-white" />
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] text-white/40 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all cursor-pointer w-fit text-sm">
+              <Camera className="size-4" />
+              Attach Photo
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </label>
+          )}
         </div>
 
         <Button

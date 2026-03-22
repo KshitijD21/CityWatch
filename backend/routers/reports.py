@@ -25,14 +25,18 @@ async def submit_report(
     user_id = token_payload["sub"]
 
     # 1. Insert community report
-    report = await insforge.insert("community_reports", {
+    report_data = {
         "user_id": user_id,
         "category": req.category,
         "description": req.description,
         "lat": req.lat,
         "lng": req.lng,
         "status": "unverified",
-    })
+    }
+    if req.image_url:
+        report_data["image_url"] = req.image_url
+
+    report = await insforge.insert("community_reports", report_data)
 
     # 2. Create linked incident (same category — both tables share categories)
     incident = await insforge.insert("incidents", {
