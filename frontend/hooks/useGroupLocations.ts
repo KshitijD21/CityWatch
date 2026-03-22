@@ -18,7 +18,7 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
   const watchIdRef = useRef<number | null>(null);
   const publishIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch initial locations from REST API
+  // Fetch initial locations + check own sharing status
   useEffect(() => {
     if (!groupId) return;
 
@@ -35,14 +35,26 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
               updated_at: m.updated_at,
             }))
           );
+          // If current user is in the sharing list, they're sharing
+          if (currentUserId && data.some((m: { user_id: string }) => m.user_id === currentUserId)) {
+            setSharing(true);
+          }
         }
       })
       .catch(() => {});
   }, [groupId, currentUserId]);
 
-  // Auto-publish own location via WebSocket every 5 minutes
+  // Auto-publish own location via WebSocket every 5 seconds
   useEffect(() => {
     if (!groupId || !currentUserId) return;
+
+    setSharing(true);
+
+    // Ensure sharing_location is true in DB
+    apiFetch("/api/location/sharing", {
+      method: "PUT",
+      body: JSON.stringify({ group_id: groupId, sharing_location: true }),
+    }).catch(() => {});
 
     const channel = `group:${groupId}:locations`;
     const latestPos = { lat: 0, lng: 0 };
@@ -96,6 +108,7 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
               lat: payload.lat,
               lng: payload.lng,
               isYou: payload.user_id === currentUserId,
+              updated_at: new Date().toISOString(),
             };
 
             if (existing >= 0) {

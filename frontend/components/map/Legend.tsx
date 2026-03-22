@@ -4,13 +4,12 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Radio, Newspaper, Users } from "lucide-react";
 
 const LEGEND_ITEMS = [
-  { color: "#dc2626", label: "Assault" },
-  { color: "#ef4444", label: "Theft / Break-in" },
-  { color: "#f97316", label: "Vandalism" },
-  { color: "#eab308", label: "Harassment" },
-  { color: "#f59e0b", label: "Disturbance" },
-  { color: "#3b82f6", label: "Infrastructure" },
-  { color: "#4d7fff", label: "Your location" },
+  { key: "assault", color: "#dc2626", label: "Assault" },
+  { key: "theft", color: "#ef4444", label: "Theft / Break-in" },
+  { key: "vandalism", color: "#f97316", label: "Vandalism" },
+  { key: "harassment", color: "#eab308", label: "Harassment" },
+  { key: "disturbance", color: "#f59e0b", label: "Disturbance" },
+  { key: "infrastructure", color: "#3b82f6", label: "Infrastructure" },
 ];
 
 const SOURCE_FILTERS = [
@@ -22,9 +21,11 @@ const SOURCE_FILTERS = [
 interface LegendProps {
   sourceFilters?: Record<string, boolean>;
   onToggleSource?: (source: string) => void;
+  categoryFilters?: Record<string, boolean>;
+  onToggleCategory?: (category: string) => void;
 }
 
-export function Legend({ sourceFilters, onToggleSource }: LegendProps) {
+export function Legend({ sourceFilters, onToggleSource, categoryFilters, onToggleCategory }: LegendProps) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -64,19 +65,31 @@ export function Legend({ sourceFilters, onToggleSource }: LegendProps) {
               </div>
             )}
 
-            {/* Category legend */}
-            <div className="space-y-1.5">
-              {LEGEND_ITEMS.map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: item.color, boxShadow: `0 0 4px ${item.color}40` }}
-                  />
-                  <span className="text-[11px] text-white/40">{item.label}</span>
-                </div>
-              ))}
+            {/* Category legend — clickable filters */}
+            <div className="space-y-1">
+              {LEGEND_ITEMS.map((item) => {
+                const active = categoryFilters?.[item.key] !== false;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => onToggleCategory?.(item.key)}
+                    className={`flex items-center gap-2 w-full px-1 py-0.5 rounded-md transition-all cursor-pointer ${
+                      active ? "opacity-100" : "opacity-30 line-through"
+                    }`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{
+                        background: active ? item.color : "#555",
+                        boxShadow: active ? `0 0 4px ${item.color}40` : "none",
+                      }}
+                    />
+                    <span className="text-[11px] text-white/40">{item.label}</span>
+                  </button>
+                );
+              })}
               {/* Community diamond indicator */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-1 py-0.5">
                 <span
                   className="w-2.5 h-2.5 shrink-0 bg-white/40 rotate-45"
                   style={{ boxShadow: "0 0 4px rgba(255,255,255,0.2)" }}
