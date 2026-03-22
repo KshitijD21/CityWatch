@@ -66,6 +66,11 @@ When the user asks about multiple people (e.g., "find where each member is and s
 - If a person has no nearby incidents, say "No recent incidents nearby."
 - If multiple people are in the same area and have the same nearby incidents, still list them separately under each person (but only the requested count)
 
+GENERAL FORMATTING:
+- NEVER repeat the same incident twice in a response. Each unique incident should appear only once.
+- When comparing people, use ### headers for each person and list incidents under each. If incidents overlap, just list them once under each person — do NOT say "the same incident" or rephrase duplicates.
+- When the user asks about their own profile/groups, list each group BY NAME and their role (admin/member). Never say "your group" — say the group name.
+
 SAFETY COMMUNICATION RULES:
 - NEVER say an area is "safe" or "unsafe." Describe what was reported.
 - Always cite specific numbers: "3 vehicle break-ins in the last 7 days."
@@ -192,12 +197,15 @@ def build_react_prompt(
     prefetch_parts = []
     if last_person:
         prefetch_parts.append(f"CONVERSATION CONTEXT: The user was previously asking about \"{last_person}\". If they say \"he\", \"she\", \"they\", or \"them\", they likely mean {last_person}.")
+    user_uid = ""
     if user_profile:
-        name = user_profile.get("display_name") or user_profile.get("email", "Unknown")
-        prefetch_parts.append(f"CURRENT USER: name={name}, id={user_profile.get('id', '')}")
+        user_name = user_profile.get("display_name") or user_profile.get("email", "Unknown")
+        user_uid = user_profile.get("id", "")
+        prefetch_parts.append(f"CURRENT USER: name={user_name}, id={user_uid}")
     if prefetched_members:
         # Organize members by group
         groups: dict[str, list[str]] = {}
+        user_roles: dict[str, str] = {}  # group_name → user's role
         for m in prefetched_members:
             name = m.get("display_name", "Unknown")
             uid = m.get("user_id", "")
@@ -206,6 +214,13 @@ def build_react_prompt(
             if group_name not in groups:
                 groups[group_name] = []
             groups[group_name].append(f"  - {name} (user_id={uid}, role={role})")
+            # Track the current user's role in each group
+            if uid == user_uid:
+                user_roles[group_name] = role
+        # Show user's own group summary first
+        if user_roles:
+            role_lines = [f"  - {gname} (role: {role})" for gname, role in user_roles.items()]
+            prefetch_parts.append("YOUR GROUPS (the current user's memberships):\n" + "\n".join(role_lines))
         member_lines = []
         for gname, members_list in groups.items():
             member_lines.append(f"  Group: {gname}")

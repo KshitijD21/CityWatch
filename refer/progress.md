@@ -9,9 +9,11 @@
 - `backend/chat/prompts.py`
   - `REACT_SYSTEM_PROMPT` — added FORMATTING RULES FOR MULTI-PERSON QUERIES: clear headers per person, exact N incidents per person (no duplicates), incidents grouped under each person
   - `REACT_SYSTEM_PROMPT` — reinforced address usage: always use "address" field from PRE-FETCHED LIVE LOCATIONS, never say "their last known area" when address is available
-  - `build_react_prompt()` — pre-fetched locations now include `coords=(lat, lng)` so LLM can pass correct per-person coordinates to `get_nearby_incidents`
+  - `build_react_prompt()` — pre-fetched locations now include `coords=(lat, lng)` so LLM can pass correct per-person coordinates to `get_nearby_incidents`; added YOUR GROUPS summary showing user's role (admin/member) per group name
+  - `REACT_SYSTEM_PROMPT` — added GENERAL FORMATTING: no duplicate incidents, always use group names (not "your group"), use `###` headers for comparisons
 - `frontend/app/chat/page.tsx`
   - `PersonLocationCard` — detects raw lat/lng coordinates in address and shows "Location available on map" instead
+  - `RichTextCard` — rewritten to handle multi-section responses: detects `###` / `**Name**` headers, renders each person as a styled card with avatar, location line (with MapPin icon), numbered/bulleted incidents as rows, and disclaimer text at bottom
 
 ## 2026-03-22 — Chat: Group member cards + person card fix
 
