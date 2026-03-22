@@ -1,14 +1,18 @@
 # Progress Log
 
-## 2026-03-22 — Fix: CSRF token collision on rapid page refresh
+## 2026-03-22 — README: expanded AI chat section
 
 ### Files Changed
 
-- `frontend/context/AuthContext.tsx`
-  - Added `safeRefreshSession()` wrapper — deduplicates concurrent `refreshSession()` calls via module-level `inflightRefresh` promise + localStorage `lastRefreshAt` cooldown (5s); prevents CSRF token rotation collision on rapid page reloads
-  - `restoreSession()` — replaced direct `insforgeAuth.auth.refreshSession()` with `safeRefreshSession()`; still always refreshes on mount to renew httpOnly cookie
-  - `refreshToken()` (interval/focus) — same replacement with `safeRefreshSession()`
-  - `logout()` — added `localStorage.removeItem('lastRefreshAt')` cleanup
+- `README.md`
+  - Expanded AI-Powered Chat section: two-lane architecture (fast lane vs ReAct reasoning), zero hallucination guarantee, hybrid cost savings, technical highlights (pure Python classifier, context chaining, server-side card building, pre-fetching, real data pipeline)
+
+## 2026-03-22 — README overhaul
+
+### Files Changed
+
+- `README.md`
+  - Complete rewrite: detailed project overview, features (map, chat, groups, briefs, reporting), tech stack table, architecture diagram, API routes table, env vars (removed OpenAI references), InsForge/TinyFish/Claude service descriptions, project structure tree, hackathon info
 
 ## 2026-03-22 — Chat: Multi-person card fix + formatting + address fallback
 
