@@ -6,6 +6,7 @@ venv/
 .env
 .env.local
 .env.*.local
+.mcp.json
 dist/
 build/
 *.log

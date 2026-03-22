@@ -3,23 +3,54 @@ Shared normalization functions for scraped data.
 """
 
 CATEGORY_KEYWORDS = {
-    "theft": ["theft", "larceny", "shoplifting", "stolen", "robbery", "burglary", "rob"],
-    "assault": ["assault", "battery", "shooting", "stabbing", "attack", "homicide", "murder", "shot", "stabbed"],
-    "vandalism": ["vandalism", "criminal damage", "graffiti", "property damage", "damaged"],
-    "harassment": ["harassment", "indecent", "stalking", "threatening", "sexual", "threat"],
-    "vehicle_breakin": ["vehicle", "break-in", "car theft", "auto theft", "carjack", "gta"],
-    "disturbance": ["disturbance", "disorderly", "noise", "fight", "trespass", "dui", "intoxicated", "domestic"],
-    "infrastructure": ["streetlight", "pothole", "road", "signal", "utility", "power outage"],
+    "assault": [
+        "assault", "battery", "shooting", "stabbing", "attack", "homicide",
+        "murder", "shot", "stabbed", "manslaughter", "rape", "shots fired",
+        "domestic violence", "aggravated",
+    ],
+    "theft": [
+        "theft", "larceny", "shoplifting", "stolen", "robbery", "burglary",
+        "rob", "shoplift", "identity theft", "fraud",
+    ],
+    "vehicle_breakin": [
+        "motor vehicle theft", "car theft", "auto theft", "carjack",
+        "stolen vehicle", "vehicle theft", "break-in", "burglary from vehicle",
+    ],
+    "vandalism": [
+        "vandalism", "criminal damage", "graffiti", "property damage",
+        "damaged", "arson",
+    ],
+    "harassment": [
+        "harassment", "indecent", "stalking", "threatening", "sexual",
+        "threat", "sexual abuse",
+    ],
+    "disturbance": [
+        "disturbance", "disorderly", "noise", "fight", "trespass", "dui",
+        "intoxicated", "domestic", "drunk driver", "hit & run", "hit and run",
+        "unwanted guest", "neighbor dispute", "loud party",
+    ],
+    "infrastructure": [
+        "streetlight", "pothole", "road", "signal", "utility", "power outage",
+        "traffic hazard",
+    ],
 }
 
 
 def normalize_category(raw_text: str) -> str:
     """Map raw offense/description text to one of 8 standard categories."""
     text = raw_text.lower()
+
+    # Check longer phrases first across ALL categories to avoid
+    # substring collisions (e.g. "motor vehicle theft" matching "theft" before "vehicle_breakin")
+    all_pairs = []
     for category, keywords in CATEGORY_KEYWORDS.items():
         for keyword in keywords:
-            if keyword in text:
-                return category
+            all_pairs.append((keyword, category))
+    all_pairs.sort(key=lambda p: len(p[0]), reverse=True)
+
+    for keyword, category in all_pairs:
+        if keyword in text:
+            return category
     return "other"
 
 

@@ -14,7 +14,7 @@ import asyncio
 import csv
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # Add backend/ to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -28,8 +28,12 @@ from utils.normalize import normalize_category
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
-# Batch size for DB inserts
-BATCH_SIZE = 50
+# Only seed incidents from the last N days
+# Crime CSV ends Sept 2025, calls CSV ends Dec 2025 — 200 days covers both
+SEED_DAYS = 200
+
+# Batch size for DB inserts (higher = fewer API calls, InsForge limit is 3000/window)
+BATCH_SIZE = 200
 
 
 def parse_crime_row(row: dict) -> tuple[dict, dict] | None:
@@ -54,6 +58,11 @@ def parse_crime_row(row: dict) -> tuple[dict, dict] | None:
             occurred_at = datetime.strptime(date_str, "%m/%d/%Y %H:%M")
         except ValueError:
             return None
+
+    # Filter by date cutoff
+    cutoff = datetime.now(timezone.utc) - timedelta(days=SEED_DAYS)
+    if occurred_at < cutoff.replace(tzinfo=None):
+        return None
 
     external_id = row.get("INC NUMBER", "").strip()
     if not external_id:
@@ -101,6 +110,11 @@ def parse_calls_row(row: dict) -> tuple[dict, dict] | None:
     if disp in ("CANCELLED", "DUPLICATE", "TEST"):
         return None
 
+    # Only include safety-relevant call types (skip welfare checks, civil matters, etc.)
+    category = normalize_category(call_type)
+    if category == "other":
+        return None
+
     date_str = row.get("CALL_RECEIVED", "").strip()
     if not date_str:
         return None
@@ -112,11 +126,15 @@ def parse_calls_row(row: dict) -> tuple[dict, dict] | None:
         except ValueError:
             return None
 
+    # Filter by date cutoff
+    cutoff = datetime.now(timezone.utc) - timedelta(days=SEED_DAYS)
+    if occurred_at < cutoff.replace(tzinfo=None):
+        return None
+
     external_id = row.get("INCIDENT_NUM", "").strip()
     if not external_id:
         return None
 
-    category = normalize_category(call_type)
     addr = row.get("HUNDREDBLOCKADDR", "").strip()
     disposition = row.get("DISPOSITION", "").strip()
     description = f"{call_type} at {addr}" + (f" — {disposition}" if disposition else "")
@@ -165,11 +183,19 @@ async def get_existing_ids(db: InsForgeClient, source_name: str) -> set[str]:
 
 
 async def insert_batch(db: InsForgeClient, pairs: list[tuple[dict, dict]]):
-    """Insert a batch of (incident, source) pairs."""
-    for incident, source in pairs:
-        result = await db.insert("incidents", incident)
-        source["incident_id"] = result[0]["id"]
-        await db.insert("incident_sources", source)
+    """Insert a batch of (incident, source) pairs using bulk inserts."""
+    incidents = [p[0] for p in pairs]
+    sources = [p[1] for p in pairs]
+
+    # Bulk insert all incidents, get back IDs
+    results = await db.insert("incidents", incidents)
+
+    # Link source records to their incident IDs
+    for source, result in zip(sources, results):
+        source["incident_id"] = result["id"]
+
+    # Bulk insert all sources
+    await db.insert("incident_sources", sources)
 
 
 async def process_csv(
