@@ -78,10 +78,10 @@ export function IncidentCard({ incident, onClose }: IncidentCardProps) {
         </div>
 
         {/* Photo */}
-        {incident.photo_url && (
+        {(incident.photo_url || incident.image_url) && (
           <div className="relative h-36 overflow-hidden">
             <img
-              src={incident.photo_url}
+              src={incident.photo_url || incident.image_url}
               alt="Incident photo"
               className="w-full h-full object-cover"
             />

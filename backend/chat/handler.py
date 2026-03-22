@@ -111,24 +111,23 @@ async def _extract_location(
 
 
 def _should_show_cards(message: str, member_names: list[str] | None = None) -> bool:
-    """Default to cards for Lane 1 queries. Only use text mode if a person's
-    name is mentioned or it's clearly a general safety tips question.
-    """
+    """Show cards only for incident/location queries. Text mode for general questions."""
     msg = message.lower()
     # If a person's name is mentioned, use text mode
     if member_names:
         for name in member_names:
             if name.lower() in msg:
                 return False
-    # Text-only for general advice/tips questions (no location/incident data needed)
-    text_only_phrases = [
-        "safety tips", "advice", "how to stay safe", "what should i do",
-        "recommend", "suggestion", "best practice",
+    # Card triggers — queries specifically about incidents, safety conditions, or locations
+    card_phrases = [
+        "incident", "crime", "report", "what happened", "happened near",
+        "happened today", "happened recently", "show me", "list",
+        "is it safe", "safe to walk", "safe near", "how safe",
+        "near campus", "near downtown", "near me", "near here",
+        "nearby", "around here", "in my area", "in this area",
+        "what's happening", "whats happening", "any crime",
     ]
-    if any(phrase in msg for phrase in text_only_phrases):
-        return False
-    # Default to cards for everything else (incident queries, location queries, etc.)
-    return True
+    return any(phrase in msg for phrase in card_phrases)
 
 
 def _extract_radius_from_message(message: str) -> float | None:

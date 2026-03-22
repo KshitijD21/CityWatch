@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { MapView, type MemberPin } from "@/components/map/MapView";
 import { Sidebar } from "@/components/map/Sidebar";
 import { IncidentCard } from "@/components/map/IncidentCard";
+import { ReportModal } from "@/components/map/ReportModal";
+import { AlertTriangle } from "lucide-react";
 import { MemberProfilePanel } from "@/components/map/MemberProfilePanel";
 import { Legend } from "@/components/map/Legend";
 import { useGroupLocations } from "@/hooks/useGroupLocations";
@@ -18,6 +20,7 @@ export default function MapPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberPin | null>(null);
+  const [showReport, setShowReport] = useState(false);
   const [sourceFilters, setSourceFilters] = useState<Record<string, boolean>>({
     police: true,
     news: true,
@@ -138,6 +141,31 @@ export default function MapPage() {
           <MemberProfilePanel
             member={selectedMember}
             onClose={() => setSelectedMember(null)}
+          />
+        )}
+
+        {/* Floating report button */}
+        <button
+          onClick={() => setShowReport(true)}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 h-11 px-5 rounded-full bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.1] text-white/70 text-sm font-medium flex items-center gap-2 shadow-lg backdrop-blur-md transition-colors cursor-pointer"
+        >
+          <AlertTriangle className="size-4" />
+          Report
+        </button>
+
+        {/* Report modal */}
+        {showReport && userLocation && (
+          <ReportModal
+            userLocation={userLocation}
+            onClose={() => setShowReport(false)}
+            onSubmitted={() => {
+              // Refresh incidents after submission
+              apiFetch(
+                `/api/incidents/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=2`
+              )
+                .then((data) => setIncidents(Array.isArray(data) ? data : []))
+                .catch(() => {});
+            }}
           />
         )}
       </div>
