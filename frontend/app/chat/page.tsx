@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Send, Loader2, Shield } from "lucide-react";
+import { useAuthContext } from "@/context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -18,6 +19,7 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatPage() {
+  const { user } = useAuthContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -78,7 +80,6 @@ export default function ChatPage() {
 
       // Add empty assistant message that we'll stream into
       setMessages((m) => [...m, { role: "assistant", content: "" }]);
-      setLoading(false);
 
       let buffer = "";
       while (true) {
@@ -100,6 +101,8 @@ export default function ChatPage() {
 
             if (event.type === "session") {
               setSessionId(event.session_id);
+            } else if (event.type === "stream_start") {
+              setLoading(false);
             } else if (event.type === "token") {
               assistantContent += event.content;
               setMessages((m) => {
@@ -216,17 +219,29 @@ export default function ChatPage() {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex items-end gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
+            {msg.role === "assistant" && (
+              <div className="w-7 h-7 rounded-full bg-[#4d7fff]/15 flex items-center justify-center shrink-0 mb-0.5">
+                <Shield className="size-3.5 text-[#7ba4ff]" />
+              </div>
+            )}
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === "user"
                   ? "bg-[#4d7fff] text-white"
                   : "bg-white/[0.05] text-white/70 border border-white/[0.06]"
               }`}
             >
-              {msg.content}
+              {msg.content || (
+                <Loader2 className="size-4 text-white/30 animate-spin" />
+              )}
             </div>
+            {msg.role === "user" && (
+              <div className="w-7 h-7 rounded-full bg-[#4d7fff]/20 flex items-center justify-center shrink-0 mb-0.5 text-[10px] font-semibold text-[#7ba4ff]">
+                {user?.name?.charAt(0)?.toUpperCase() || "U"}
+              </div>
+            )}
           </div>
         ))}
 
