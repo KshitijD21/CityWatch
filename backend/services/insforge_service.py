@@ -35,51 +35,6 @@ class InsForgeClient:
     # Auth
     # ------------------------------------------------------------------
 
-    async def sign_up(self, email: str, password: str, name: str | None = None) -> dict:
-        client = await self._get_client()
-        body: dict = {"email": email, "password": password}
-        if name:
-            body["name"] = name
-        resp = await client.post(
-            "/api/auth/users",
-            json=body,
-        )
-        if resp.status_code >= 400:
-            try:
-                err = resp.json()
-                detail = err.get("message", resp.text)
-            except Exception:
-                detail = resp.text
-            code = 409 if resp.status_code == 409 else resp.status_code
-            raise HTTPException(status_code=code, detail=detail)
-        return resp.json()
-
-    async def sign_in_password(self, email: str, password: str) -> dict:
-        client = await self._get_client()
-        resp = await client.post(
-            "/api/auth/sessions",
-            json={"email": email, "password": password},
-        )
-        if resp.status_code >= 400:
-            try:
-                err = resp.json()
-                detail = err.get("message", "Invalid credentials")
-            except Exception:
-                detail = "Invalid credentials"
-            raise HTTPException(status_code=401, detail=detail)
-        return resp.json()
-
-    async def sign_in_google(self, google_token: str) -> dict:
-        """Exchange Google OAuth code for InsForge tokens via PKCE flow."""
-        client = await self._get_client()
-        resp = await client.post(
-            "/api/auth/oauth/exchange",
-            json={"code": google_token, "code_verifier": ""},
-        )
-        if resp.status_code >= 400:
-            raise HTTPException(status_code=401, detail="Google auth failed")
-        return resp.json()
-
     async def get_auth_user(self, access_token: str) -> dict:
         client = await self._get_client()
         resp = await client.get(

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
@@ -57,34 +57,6 @@ class PlaceCreate(BaseModel):
     name: str
     address: str
     type: str  # "home", "school", "work", "favorite"
-
-class SignupRequest(BaseModel):
-    email: str
-    password: str
-    name: str
-    age_band: str
-
-
-class LoginRequest(BaseModel):
-    email: Optional[str] = None
-    password: Optional[str] = None
-    google_token: Optional[str] = None
-
-    @model_validator(mode="after")
-    def check_credentials(self):
-        has_email_pw = self.email is not None and self.password is not None
-        has_google = self.google_token is not None
-        if not has_email_pw and not has_google:
-            raise ValueError("Provide email+password or google_token")
-        if has_email_pw and has_google:
-            raise ValueError("Provide email+password or google_token, not both")
-        return self
-
-
-class AuthResponse(BaseModel):
-    user_id: str
-    token: str
-    onboarded: bool
 
 
 class UserProfile(BaseModel):
