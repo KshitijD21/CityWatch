@@ -5,6 +5,7 @@ from models.schemas import (
     AuthResponse,
     UserProfile,
     UserUpdateRequest,
+    InitProfileRequest,
 )
 from services.insforge_service import insforge
 from utils.helpers import get_current_user
@@ -73,16 +74,51 @@ async def login(req: LoginRequest):
     return AuthResponse(user_id=user_id, token=access_token, onboarded=onboarded)
 
 
+@router.post("/init")
+async def init_profile(
+    req: InitProfileRequest,
+    token_payload: dict = Depends(get_current_user),
+):
+    """Create users table row if it doesn't exist. Idempotent."""
+    user_id = token_payload["sub"]
+    email = token_payload.get("email", "")
+
+    # Check if user row already exists
+    try:
+        existing = await insforge.query(
+            "users",
+            select="id,onboarded",
+            filters={"id": f"eq.{user_id}"},
+            single=True,
+        )
+        return {"user_id": existing["id"], "onboarded": existing.get("onboarded", False)}
+    except HTTPException:
+        pass
+
+    # Create user row
+    await insforge.insert("users", {
+        "id": user_id,
+        "email": email,
+        "name": req.name,
+        "age_band": req.age_band,
+        "onboarded": False,
+    })
+    return {"user_id": user_id, "onboarded": False}
+
+
 @router.get("/me", response_model=UserProfile)
 async def get_me(token_payload: dict = Depends(get_current_user)):
     """Get current user profile with groups and saved places."""
     user_id = token_payload["sub"]
 
-    user_row = await insforge.query(
-        "users",
-        filters={"id": f"eq.{user_id}"},
-        single=True,
-    )
+    try:
+        user_row = await insforge.query(
+            "users",
+            filters={"id": f"eq.{user_id}"},
+            single=True,
+        )
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="User profile not found")
 
     # Get groups via group_members join
     memberships = await insforge.query(
