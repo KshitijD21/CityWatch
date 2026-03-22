@@ -25,16 +25,13 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 from database import InsForgeClient
 from utils.normalize import normalize_category
+from utils.db_helpers import get_existing_ids, insert_batch, BATCH_SIZE
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # Only seed incidents from the last N days
 # Crime CSV ends Sept 2025, calls CSV ends Dec 2025 — 200 days covers both
 SEED_DAYS = 200
-
-# Batch size for DB inserts (higher = fewer API calls, InsForge limit is 3000/window)
-BATCH_SIZE = 200
-
 
 def parse_crime_row(row: dict) -> tuple[dict, dict] | None:
     """Parse a crime_data_geo.csv row into (incident, source) records."""
@@ -160,44 +157,6 @@ def parse_calls_row(row: dict) -> tuple[dict, dict] | None:
     return (incident, source)
 
 
-async def get_existing_ids(db: InsForgeClient, source_name: str) -> set[str]:
-    """Fetch all external_ids already in DB for a given source."""
-    existing = set()
-    offset = 0
-    limit = 1000
-
-    while True:
-        rows = await db.select(
-            "incident_sources",
-            columns="external_id",
-            filters={"source_name": source_name},
-            limit=limit,
-        )
-        for r in rows:
-            existing.add(r["external_id"])
-        if len(rows) < limit:
-            break
-        offset += limit
-
-    return existing
-
-
-async def insert_batch(db: InsForgeClient, pairs: list[tuple[dict, dict]]):
-    """Insert a batch of (incident, source) pairs using bulk inserts."""
-    incidents = [p[0] for p in pairs]
-    sources = [p[1] for p in pairs]
-
-    # Bulk insert all incidents, get back IDs
-    results = await db.insert("incidents", incidents)
-
-    # Link source records to their incident IDs
-    for source, result in zip(sources, results):
-        source["incident_id"] = result["id"]
-
-    # Bulk insert all sources
-    await db.insert("incident_sources", sources)
-
-
 async def process_csv(
     db: InsForgeClient,
     filename: str,
@@ -213,6 +172,11 @@ async def process_csv(
     print(f"  Loading existing IDs for {source_name}...")
     existing_ids = await get_existing_ids(db, source_name)
     print(f"  Found {len(existing_ids)} existing records")
+
+    # Early exit if data already seeded (skip full CSV scan)
+    if existing_ids and "--force" not in sys.argv:
+        print(f"  SKIP {filename} — already seeded ({len(existing_ids)} records). Use --force to re-scan.")
+        return
 
     print(f"  Processing {filename}...")
     total = 0

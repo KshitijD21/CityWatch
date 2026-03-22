@@ -8,9 +8,11 @@
     "build": "pnpm --filter frontend build",
     "lint": "pnpm --filter frontend lint",
     "migrate": "cd scripts && python3 migrate.py",
-    "seed": "cd scripts && python seed_data.py",
-    "scrape:police": "cd scripts && python scrape_police.py",
-    "scrape:news": "cd scripts && python scrape_news.py"
+    "seed": "cd backend/scripts && python3 seed_data.py",
+    "seed:tempe": "cd backend/scripts && python3 seed_tempe.py",
+    "scrape": "cd backend/scripts && python3 seed_tinyfish.py",
+    "scrape:police": "cd backend/scripts && python3 scrape_police.py",
+    "scrape:news": "cd backend/scripts && python3 scrape_news.py"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

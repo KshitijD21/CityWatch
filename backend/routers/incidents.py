@@ -1,6 +1,23 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks, Query
 
 router = APIRouter()
+
+
+@router.post("/scrape")
+async def trigger_scrape(
+    background_tasks: BackgroundTasks,
+    hours: int = Query(default=24, ge=1, le=168),
+):
+    """Trigger a TinyFish scrape in the background.
+
+    Args:
+        hours: scrape incidents from the last N hours (default 24, max 168/7 days)
+    """
+    from services.tinyfish_service import scrape_all
+
+    background_tasks.add_task(scrape_all, since_hours=hours)
+    return {"status": "started", "hours": hours}
+
 
 @router.get("/nearby")
 async def get_nearby_incidents():
