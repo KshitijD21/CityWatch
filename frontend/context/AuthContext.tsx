@@ -53,26 +53,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore session on mount from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("token");
-    if (saved) {
-      fetchUser(saved);
-    } else {
-      setState((s) => ({ ...s, loading: false }));
+    async function restoreSession() {
+      // Try to refresh the token via InsForge httpOnly cookie
+      const { data } = await insforge.auth.refreshSession().catch(() => ({ data: null }));
+      if (data?.accessToken) {
+        localStorage.setItem("token", data.accessToken);
+        await fetchUser(data.accessToken);
+        return;
+      }
+      // Fall back to stored token
+      const saved = localStorage.getItem("token");
+      if (saved) {
+        fetchUser(saved);
+      } else {
+        setState((s) => ({ ...s, loading: false }));
+      }
     }
+    restoreSession();
   }, [fetchUser]);
 
   // Keep session alive — re-validate token on tab focus
   useEffect(() => {
     async function refreshToken() {
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          await fetchUser(token);
-        } catch {
-          // Token expired
-          localStorage.removeItem("token");
-          setState({ user: null, token: null, loading: false });
-        }
+      const { data } = await insforge.auth.refreshSession().catch(() => ({ data: null }));
+      if (data?.accessToken) {
+        localStorage.setItem("token", data.accessToken);
       }
     }
 

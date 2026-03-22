@@ -1,21 +1,12 @@
 # Progress Log
 
-## 2026-03-22 — Fix chat routing, geocoding, location precision, time display
+## 2026-03-22 — Token Auto-Refresh + WebSocket Location Auto-Publish
 
 ### Files Changed
 
-- `backend/chat/routing.py` — `classify_lane()`: added first-name matching; added LANE2_KEYWORDS: "group member", "where are they/those", "member safe", "locate my", "find my friend/family"
-- `backend/chat/handler.py`:
-  - `_should_show_cards()`: same first-name matching fix to suppress cards when a person name is detected
-  - `_message_explicitly_requests_user_location()`: added "where am i" to self-location phrases
-  - `_extract_location()`: skip geocoding the raw message for self-location queries ("where am i", "am i safe") to prevent Mapbox returning generic Phoenix results; falls through to GPS instead
-  - `handle_lane1()`: reverse geocode GPS coords to precise address when location_name is generic ("your current location") OR raw coords (regex match `^\d+\.\d+, -?\d+\.\d+$`); also fixed card summary prompt using hardcoded "last 30 days" → now uses actual `days` variable
-  - `mentioned_person` extraction (handle_lane2): added first-name matching so "Anirudh" matches "Anirudh Palaskar" — fixes person card showing wrong name
-  - `_extract_days_from_message()`: support "past N hr" in addition to "last N hr"
-  - `handle_lane2()`: pre-fetch locations now enriched with reverse-geocoded address, `updated_ago`, and `is_stale` — so the LLM prompt gets human-readable location data instead of raw coords/timestamps
-- `backend/chat/prompts.py` — `build_react_prompt()`: format pre-fetched members and locations as readable list instead of raw dicts; added explicit instruction for "where is everyone" queries to report ALL members; updated PROCESS to prioritize pre-fetched data over tool calls
-- `backend/chat/geocoding.py` — full rewrite: switched from Nominatim (rate-limited, getting 429s) to Mapbox reverse geocoding with `MAPBOX_TOKEN`; `reverse_geocode()` tries 3 type sets progressively (address/poi → neighborhood/locality → place); `reverse_geocode_batch()` uses `asyncio.Semaphore(10)` for bounded concurrency; `geocode_location()` uses Mapbox forward geocoding with Phoenix metro bbox
-- `frontend/app/chat/page.tsx` — `timeAgo()`: future timestamps (from timezone mismatch) now show absolute time instead of "just now"
+- `frontend/context/AuthContext.tsx` — added `insforge` import; `restoreSession()` tries `getCurrentSession()` to refresh token via httpOnly cookie before falling back to stored token; added 10-minute interval + tab focus listener to silently refresh token and keep session alive
+- `frontend/hooks/useGroupLocations.ts` — added `displayName` parameter; added auto-publish effect: connects to InsForge WebSocket, watches GPS via `navigator.geolocation.watchPosition`, publishes location to `group:{id}:locations` channel every 5 seconds via `insforge.realtime.publish()`
+- `frontend/app/map/page.tsx` — passes `user?.name` as third arg to `useGroupLocations()`
 
 ## 2026-03-22 — Fix /nearby incidents bounding box + 25-mile radius + WebGL rendering
 
