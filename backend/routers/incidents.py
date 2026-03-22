@@ -46,22 +46,18 @@ async def get_nearby_incidents(
     # Approximate bounding box for filtering (1 degree ≈ 69 miles)
     delta = radius / 69.0
     filters = {
-        "lat": f"gte.{lat - delta}",
-        "lng": f"gte.{lng - delta}",
+        "and": f"(lat.gte.{lat - delta},lat.lte.{lat + delta},lng.gte.{lng - delta},lng.lte.{lng + delta})",
     }
 
-    # Fetch from DB with bounding box
+    # Fetch from DB with full bounding box
     rows = await insforge.query(
         "incidents",
         filters=filters,
     )
 
-    # Also filter by upper bounds (PostgREST doesn't support multiple filters on same column easily)
-    # and calculate exact distance
+    # Calculate exact Haversine distance
     results = []
     for row in rows:
-        if row["lat"] > lat + delta or row["lng"] > lng + delta:
-            continue
         dist = haversine_distance(lat, lng, row["lat"], row["lng"])
         if dist <= radius:
             row["distance_miles"] = round(dist, 2)
@@ -82,12 +78,11 @@ async def get_incidents_in_bounds(
 ):
     """Get incidents within map viewport bounds."""
     filters = {
-        "lat": f"gte.{south}",
-        "lng": f"gte.{west}",
+        "and": f"(lat.gte.{south},lat.lte.{north},lng.gte.{west},lng.lte.{east})",
     }
     rows = await insforge.query("incidents", filters=filters)
 
-    results = [r for r in rows if r["lat"] <= north and r["lng"] <= east]
+    results = list(rows) if isinstance(rows, list) else [rows]
     results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
     return results[:limit]
 
