@@ -41,6 +41,10 @@ class GroupCreate(BaseModel):
     name: str
     type: str  # "family" or "friends"
 
+class MemberCreate(BaseModel):
+    display_name: str
+    age_band: Optional[str] = None
+
 class PlaceCreate(BaseModel):
     name: str
     address: str
