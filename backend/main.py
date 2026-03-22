@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     await insforge.close()
 
 
-app = FastAPI(title="CityWatch API", version="0.1.0", lifespan=lifespan, redirect_slashes=False)
+app = FastAPI(title="CityWatch API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
