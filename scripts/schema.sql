@@ -31,7 +31,7 @@ CREATE TABLE group_members (
   display_name TEXT NOT NULL,
   age_band TEXT,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
-  sharing_location BOOLEAN DEFAULT false,
+  sharing_location BOOLEAN DEFAULT true,
   joined_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(group_id, user_id)
 );
