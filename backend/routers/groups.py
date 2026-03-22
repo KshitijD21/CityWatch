@@ -1,7 +1,7 @@
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
-from models.schemas import GroupCreate, MemberCreate
+from models.schemas import GroupCreate, GroupUpdate, MemberCreate
 from services.insforge_service import insforge
 from utils.helpers import get_current_user
 
@@ -80,6 +80,58 @@ async def get_group(group_id: str, token_payload: dict = Depends(get_current_use
     )
 
     return {**group, "members": members}
+
+
+@router.patch("/{group_id}")
+async def update_group(
+    group_id: str,
+    req: GroupUpdate,
+    token_payload: dict = Depends(get_current_user),
+):
+    """Rename a group (admin only)."""
+    user_id = token_payload["sub"]
+
+    # Verify user is admin
+    membership = await insforge.query(
+        "group_members",
+        select="role",
+        filters={"group_id": f"eq.{group_id}", "user_id": f"eq.{user_id}"},
+    )
+    if not membership or membership[0].get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can update this group")
+
+    update_data = req.model_dump(exclude_none=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    updated = await insforge.update(
+        "groups",
+        update_data,
+        filters={"id": f"eq.{group_id}"},
+    )
+    return updated
+
+
+@router.delete("/{group_id}")
+async def delete_group(group_id: str, token_payload: dict = Depends(get_current_user)):
+    """Delete a group and all its members (admin only)."""
+    user_id = token_payload["sub"]
+
+    # Verify user is admin
+    membership = await insforge.query(
+        "group_members",
+        select="role",
+        filters={"group_id": f"eq.{group_id}", "user_id": f"eq.{user_id}"},
+    )
+    if not membership or membership[0].get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete this group")
+
+    # Delete all members first
+    await insforge.delete("group_members", filters={"group_id": f"eq.{group_id}"})
+    # Delete the group
+    await insforge.delete("groups", filters={"id": f"eq.{group_id}"})
+
+    return {"deleted": True}
 
 
 @router.get("/join/{invite_code}")

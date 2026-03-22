@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, MapPin, Users, ShieldCheck } from "lucide-react";
 import { EthicsStep } from "@/components/onboarding/EthicsStep";
 import { CreateGroupStep } from "@/components/onboarding/CreateGroupStep";
 import { AddMembersStep } from "@/components/onboarding/AddMembersStep";
 import { AddPlacesStep } from "@/components/onboarding/AddPlacesStep";
+import { useAuthContext } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 
 const TOTAL_STEPS = 4;
@@ -40,10 +41,20 @@ const STEP_VISUALS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user, loading } = useAuthContext();
   const [step, setStep] = useState(0);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  // Redirect to signup if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/signup");
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) return null;
 
   async function next() {
     if (step >= TOTAL_STEPS - 1) {

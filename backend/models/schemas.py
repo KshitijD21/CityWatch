@@ -45,6 +45,9 @@ class GroupCreate(BaseModel):
     name: str
     type: str  # "family" or "friends"
 
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+
 class MemberCreate(BaseModel):
     display_name: str
     age_band: Optional[str] = None

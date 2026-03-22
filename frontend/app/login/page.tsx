@@ -114,13 +114,6 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* Demo shortcut — remove before production */}
-        <Link
-          href="/map"
-          className="block text-center text-xs text-white/15 hover:text-white/30 mt-4 transition-colors"
-        >
-          Skip to demo →
-        </Link>
       </div>
     </div>
   );

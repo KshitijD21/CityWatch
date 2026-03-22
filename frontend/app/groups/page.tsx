@@ -2,8 +2,20 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Users, Plus, Copy, Check, Shield } from "lucide-react";
+import {
+  ArrowLeft,
+  Users,
+  Plus,
+  Copy,
+  Check,
+  Shield,
+  Pencil,
+  Trash2,
+  X,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api";
 import type { Group } from "@/types";
 
@@ -11,6 +23,10 @@ export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch("/api/groups")
@@ -26,12 +42,51 @@ export default function GroupsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
+  function startRename(group: Group) {
+    setEditingId(group.id);
+    setEditName(group.name);
+  }
+
+  async function saveRename(groupId: string) {
+    if (!editName.trim()) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/api/groups/${groupId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: editName.trim() }),
+      });
+      setGroups((prev) =>
+        prev.map((g) => (g.id === groupId ? { ...g, name: editName.trim() } : g))
+      );
+      setEditingId(null);
+    } catch {
+      // keep editing state so user can retry
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteGroup(groupId: string) {
+    setDeletingId(groupId);
+    try {
+      await apiFetch(`/api/groups/${groupId}`, { method: "DELETE" });
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    } catch {
+      // silently fail
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-[#08080d] text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <Link href="/map" className="p-2 rounded-lg text-white/40 hover:text-white/70 transition-colors">
+          <Link
+            href="/map"
+            className="p-2 rounded-lg text-white/40 hover:text-white/70 transition-colors"
+          >
             <ArrowLeft className="size-5" />
           </Link>
           <div className="flex items-center gap-2">
@@ -39,13 +94,15 @@ export default function GroupsPage() {
             <span className="text-sm font-semibold">My Groups</span>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          className="text-sm text-[#7ba4ff] hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
-        >
-          <Plus className="size-4 mr-1" />
-          New
-        </Button>
+        <Link href="/onboarding">
+          <Button
+            variant="ghost"
+            className="text-sm text-[#7ba4ff] hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
+          >
+            <Plus className="size-4 mr-1" />
+            New
+          </Button>
+        </Link>
       </div>
 
       <div className="px-4 py-6 max-w-lg mx-auto">
@@ -73,29 +130,91 @@ export default function GroupsPage() {
                 key={group.id}
                 className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-white">{group.name}</h3>
-                  <span className="text-xs text-white/25 capitalize">{group.type}</span>
-                </div>
+                {editingId === group.id ? (
+                  /* Rename mode */
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRename(group.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      autoFocus
+                      className="flex-1 bg-white/[0.03] border-white/[0.08] text-white text-sm focus-visible:ring-[#4d7fff]/50"
+                    />
+                    <button
+                      onClick={() => saveRename(group.id)}
+                      disabled={saving || !editName.trim()}
+                      className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-400/10 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {saving ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Check className="size-4" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="p-1.5 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ) : (
+                  /* Normal mode */
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-white">
+                        {group.name}
+                      </h3>
+                      <span className="text-xs text-white/25 capitalize">
+                        {group.type}
+                      </span>
+                    </div>
 
-                <div className="flex items-center gap-2 mt-3">
-                  <button
-                    onClick={() => copyInvite(group)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-white/40 hover:text-white/60 transition-colors cursor-pointer"
-                  >
-                    {copiedId === group.id ? (
-                      <>
-                        <Check className="size-3 text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-3" />
-                        Invite link
-                      </>
-                    )}
-                  </button>
-                </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <button
+                        onClick={() => copyInvite(group)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-white/40 hover:text-white/60 transition-colors cursor-pointer"
+                      >
+                        {copiedId === group.id ? (
+                          <>
+                            <Check className="size-3 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-3" />
+                            Invite link
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => startRename(group)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-white/40 hover:text-white/60 transition-colors cursor-pointer"
+                      >
+                        <Pencil className="size-3" />
+                        Rename
+                      </button>
+
+                      <button
+                        onClick={() => deleteGroup(group.id)}
+                        disabled={deletingId === group.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/10 bg-red-500/5 text-xs text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {deletingId === group.id ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3" />
+                        )}
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
