@@ -35,35 +35,46 @@ class InsForgeClient:
     # Auth
     # ------------------------------------------------------------------
 
-    async def sign_up(self, email: str, password: str) -> dict:
+    async def sign_up(self, email: str, password: str, name: str | None = None) -> dict:
         client = await self._get_client()
+        body: dict = {"email": email, "password": password}
+        if name:
+            body["name"] = name
         resp = await client.post(
-            "/auth/v1/signup",
-            json={"email": email, "password": password},
+            "/api/auth/users",
+            json=body,
         )
         if resp.status_code >= 400:
-            detail = resp.json().get("msg", resp.text)
-            code = 409 if resp.status_code == 422 else resp.status_code
+            try:
+                err = resp.json()
+                detail = err.get("message", resp.text)
+            except Exception:
+                detail = resp.text
+            code = 409 if resp.status_code == 409 else resp.status_code
             raise HTTPException(status_code=code, detail=detail)
         return resp.json()
 
     async def sign_in_password(self, email: str, password: str) -> dict:
         client = await self._get_client()
         resp = await client.post(
-            "/auth/v1/token",
-            params={"grant_type": "password"},
+            "/api/auth/sessions",
             json={"email": email, "password": password},
         )
         if resp.status_code >= 400:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            try:
+                err = resp.json()
+                detail = err.get("message", "Invalid credentials")
+            except Exception:
+                detail = "Invalid credentials"
+            raise HTTPException(status_code=401, detail=detail)
         return resp.json()
 
     async def sign_in_google(self, google_token: str) -> dict:
+        """Exchange Google OAuth code for InsForge tokens via PKCE flow."""
         client = await self._get_client()
         resp = await client.post(
-            "/auth/v1/token",
-            params={"grant_type": "id_token"},
-            json={"provider": "google", "id_token": google_token},
+            "/api/auth/oauth/exchange",
+            json={"code": google_token, "code_verifier": ""},
         )
         if resp.status_code >= 400:
             raise HTTPException(status_code=401, detail="Google auth failed")
@@ -72,7 +83,7 @@ class InsForgeClient:
     async def get_auth_user(self, access_token: str) -> dict:
         client = await self._get_client()
         resp = await client.get(
-            "/auth/v1/user",
+            "/api/auth/sessions/current",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if resp.status_code >= 400:
@@ -105,7 +116,7 @@ class InsForgeClient:
         if single:
             headers["Accept"] = "application/vnd.pgrst.object+json"
         resp = await client.get(
-            f"/rest/v1/{table}",
+            f"/api/database/records/{table}",
             params=params,
             headers=headers,
         )
@@ -126,7 +137,7 @@ class InsForgeClient:
             "Prefer": "return=representation",
         }
         resp = await client.post(
-            f"/rest/v1/{table}",
+            f"/api/database/records/{table}",
             json=data if isinstance(data, list) else [data],
             headers=headers,
         )
@@ -152,7 +163,7 @@ class InsForgeClient:
             "Prefer": "return=representation",
         }
         resp = await client.patch(
-            f"/rest/v1/{table}",
+            f"/api/database/records/{table}",
             params=params,
             json=data,
             headers=headers,
@@ -177,7 +188,7 @@ class InsForgeClient:
             "Prefer": "return=representation,resolution=merge-duplicates",
         }
         resp = await client.post(
-            f"/rest/v1/{table}",
+            f"/api/database/records/{table}",
             json=[data],
             headers=headers,
         )
@@ -196,7 +207,7 @@ class InsForgeClient:
         client = await self._get_client()
         params = self._build_filters(filters)
         resp = await client.delete(
-            f"/rest/v1/{table}",
+            f"/api/database/records/{table}",
             params=params,
             headers=self._auth_headers(token),
         )
@@ -212,7 +223,7 @@ class InsForgeClient:
     ) -> dict:
         client = await self._get_client()
         resp = await client.post(
-            f"/rest/v1/rpc/{function_name}",
+            f"/api/database/rpc/{function_name}",
             json=params,
             headers=self._auth_headers(token),
         )

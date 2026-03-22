@@ -16,10 +16,10 @@ router = APIRouter()
 async def signup(req: SignupRequest):
     """Create account via InsForge auth, then store profile in users table."""
     # 1. Create auth user in InsForge
-    auth_result = await insforge.sign_up(req.email, req.password)
+    auth_result = await insforge.sign_up(req.email, req.password, req.name)
 
     user_id = auth_result.get("user", {}).get("id")
-    access_token = auth_result.get("access_token", "")
+    access_token = auth_result.get("accessToken", "")
     if not user_id:
         raise HTTPException(status_code=500, detail="Signup failed: no user id returned")
 
@@ -45,7 +45,7 @@ async def login(req: LoginRequest):
         auth_result = await insforge.sign_in_password(req.email, req.password)
 
     user_id = auth_result.get("user", {}).get("id")
-    access_token = auth_result.get("access_token", "")
+    access_token = auth_result.get("accessToken", "")
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication failed")
 

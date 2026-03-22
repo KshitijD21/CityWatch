@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from config import INSFORGE_JWT_SECRET
+from services.insforge_service import insforge
 
 _security = HTTPBearer()
 _security_optional = HTTPBearer(auto_error=False)
@@ -12,20 +11,17 @@ _security_optional = HTTPBearer(auto_error=False)
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_security),
 ) -> dict:
-    """Decode InsForge JWT and return the payload. Raises 401 on failure."""
+    """Validate token via InsForge and return the user payload. Raises 401 on failure."""
     try:
-        payload = jwt.decode(
-            credentials.credentials,
-            INSFORGE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-        if "sub" not in payload:
+        result = await insforge.get_auth_user(credentials.credentials)
+        user = result.get("user", {})
+        if not user.get("id"):
             raise HTTPException(status_code=401, detail="Invalid token payload")
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+        # Return a payload dict compatible with existing code (sub = user id)
+        return {"sub": user["id"], "email": user.get("email", ""), "role": user.get("role", "")}
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -36,12 +32,10 @@ async def get_optional_user(
     if credentials is None:
         return None
     try:
-        payload = jwt.decode(
-            credentials.credentials,
-            INSFORGE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-        return payload if "sub" in payload else None
-    except jwt.InvalidTokenError:
+        result = await insforge.get_auth_user(credentials.credentials)
+        user = result.get("user", {})
+        if not user.get("id"):
+            return None
+        return {"sub": user["id"], "email": user.get("email", ""), "role": user.get("role", "")}
+    except Exception:
         return None
