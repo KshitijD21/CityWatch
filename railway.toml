@@ -3,6 +3,6 @@ builder = "nixpacks"
 buildCommand = "pip install -r backend/requirements.txt"
 
 [deploy]
-startCommand = "sh -c 'cd /app/backend && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
+startCommand = "sh -c 'ls / && ls /app/ 2>/dev/null && ls /opt/ 2>/dev/null && pwd && ls'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
