@@ -22,7 +22,7 @@ interface EthicsStepProps {
 
 export function EthicsStep({ onContinue }: EthicsStepProps) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
+    <div>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
           <AlertTriangle className="size-5 text-amber-400" />

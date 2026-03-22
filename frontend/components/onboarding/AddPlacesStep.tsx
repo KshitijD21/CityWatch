@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Input } from "@/components/ui/Input";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { AddressInput } from "./AddressInput";
 import { MapPin, Home, Building2, Plus, Loader2, Navigation } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -23,6 +23,29 @@ export function AddPlacesStep({ onContinue }: AddPlacesStepProps) {
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState<string | null>(null);
 
+  // Auto-fetch home address on mount
+  useEffect(() => {
+    setLocating("home");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const addr = data.display_name?.split(",").slice(0, 3).join(",").trim();
+          setHomeAddress(addr || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } catch {
+          setHomeAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
+        setLocating(null);
+      },
+      () => setLocating(null),
+      { timeout: 5000 }
+    );
+  }, []);
+
   async function useGPS(field: "home" | "work") {
     setLocating(field);
     try {
@@ -30,9 +53,20 @@ export function AddPlacesStep({ onContinue }: AddPlacesStepProps) {
         navigator.geolocation.getCurrentPosition(resolve, reject)
       );
       const { latitude, longitude } = pos.coords;
-      const address = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-      if (field === "home") setHomeAddress(address);
-      else setWorkAddress(address);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+        );
+        const data = await res.json();
+        const addr = data.display_name?.split(",").slice(0, 3).join(",").trim();
+        const address = addr || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        if (field === "home") setHomeAddress(address);
+        else setWorkAddress(address);
+      } catch {
+        const address = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        if (field === "home") setHomeAddress(address);
+        else setWorkAddress(address);
+      }
     } catch {
       // silently fail
     } finally {
@@ -69,7 +103,7 @@ export function AddPlacesStep({ onContinue }: AddPlacesStepProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
+    <div>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-[#4d7fff]/10 flex items-center justify-center">
           <MapPin className="size-5 text-[#7ba4ff]" />
@@ -120,12 +154,10 @@ export function AddPlacesStep({ onContinue }: AddPlacesStepProps) {
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <Input
-                type="text"
+              <AddressInput
                 placeholder="456 University Ave"
                 value={workAddress}
-                onChange={(e) => setWorkAddress(e.target.value)}
-                className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20 focus-visible:ring-[#4d7fff]/50"
+                onChange={setWorkAddress}
               />
             </div>
             <button

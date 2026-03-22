@@ -26,21 +26,20 @@ export function AddMembersStep({ groupId, groupName, onContinue }: AddMembersSte
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  async function addMember() {
-    if (!newName.trim() || !groupId) return;
-    setLoading(true);
+  function addMember() {
+    if (!newName.trim()) return;
 
-    try {
-      await apiFetch(`/api/groups/${groupId}/members`, {
+    // Add locally immediately
+    setMembers((prev) => [...prev, { name: newName.trim(), role: newRole }]);
+    const savedName = newName.trim();
+    setNewName("");
+
+    // Fire-and-forget API call
+    if (groupId) {
+      apiFetch(`/api/groups/${groupId}/members`, {
         method: "POST",
-        body: JSON.stringify({ name: newName.trim(), role: newRole.toLowerCase() }),
-      });
-      setMembers([...members, { name: newName.trim(), role: newRole }]);
-      setNewName("");
-    } catch {
-      // silently fail for hackathon
-    } finally {
-      setLoading(false);
+        body: JSON.stringify({ name: savedName, role: newRole.toLowerCase() }),
+      }).catch(() => {});
     }
   }
 
@@ -52,7 +51,7 @@ export function AddMembersStep({ groupId, groupName, onContinue }: AddMembersSte
   }
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
+    <div>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-[#4d7fff]/10 flex items-center justify-center">
           <UserPlus className="size-5 text-[#7ba4ff]" />

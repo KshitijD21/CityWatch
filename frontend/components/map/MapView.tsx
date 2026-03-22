@@ -5,7 +5,6 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Incident } from "@/types";
 
-// Free dark tile style (no API key needed)
 const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -19,16 +18,73 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#6b7280",
 };
 
+export interface MemberPin {
+  name: string;
+  lat: number;
+  lng: number;
+  isYou?: boolean;
+}
+
 interface MapViewProps {
   center: { lat: number; lng: number };
   incidents: Incident[];
+  members: MemberPin[];
   onIncidentClick: (incident: Incident) => void;
 }
 
-export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
+function avatarUrl(name: string): string {
+  return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+}
+
+function createMemberMarker(member: MemberPin): HTMLDivElement {
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+  `;
+
+  const bubble = document.createElement("div");
+  bubble.style.cssText = `
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid ${member.isYou ? "#4d7fff" : "#22c55e"};
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    background: #1a1a2e;
+  `;
+
+  const img = document.createElement("img");
+  img.src = avatarUrl(member.name);
+  img.style.cssText = "width: 100%; height: 100%; object-fit: cover;";
+  bubble.appendChild(img);
+
+  const label = document.createElement("div");
+  label.textContent = member.isYou ? "You" : member.name;
+  label.style.cssText = `
+    margin-top: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    padding: 1px 6px;
+    border-radius: 6px;
+    white-space: nowrap;
+  `;
+
+  wrapper.appendChild(bubble);
+  wrapper.appendChild(label);
+  return wrapper;
+}
+
+export function MapView({ center, incidents, members, onIncidentClick }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const incidentMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const memberMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // Initialize map
   useEffect(() => {
@@ -42,21 +98,6 @@ export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
       attributionControl: false,
     });
 
-    // Add user location dot
-    const userEl = document.createElement("div");
-    userEl.style.cssText = `
-      width: 16px;
-      height: 16px;
-      background: #4d7fff;
-      border: 3px solid #1a1a2e;
-      border-radius: 50%;
-      box-shadow: 0 0 12px rgba(77, 127, 255, 0.5);
-    `;
-
-    new maplibregl.Marker({ element: userEl })
-      .setLngLat([center.lng, center.lat])
-      .addTo(map.current);
-
     map.current.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
       "bottom-right"
@@ -68,34 +109,56 @@ export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
     };
   }, [center]);
 
-  // Update incident markers
+  // Member markers
   useEffect(() => {
     if (!map.current) return;
 
-    // Remove old markers
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
+    memberMarkersRef.current.forEach((m) => m.remove());
+    memberMarkersRef.current = [];
+
+    members.forEach((member) => {
+      const el = createMemberMarker(member);
+      const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
+        .setLngLat([member.lng, member.lat])
+        .addTo(map.current!);
+      memberMarkersRef.current.push(marker);
+    });
+  }, [members]);
+
+  // Incident markers
+  useEffect(() => {
+    if (!map.current) return;
+
+    incidentMarkersRef.current.forEach((m) => m.remove());
+    incidentMarkersRef.current = [];
 
     incidents.forEach((incident) => {
       const color = CATEGORY_COLORS[incident.category] || "#6b7280";
       const el = document.createElement("div");
       el.style.cssText = `
-        width: 14px;
-        height: 14px;
+        width: 10px;
+        height: 10px;
         background: ${color};
-        border: 2px solid rgba(0,0,0,0.3);
+        border: 1.5px solid rgba(0,0,0,0.4);
         border-radius: 50%;
         cursor: pointer;
-        box-shadow: 0 0 8px ${color}60;
+        box-shadow: 0 0 6px ${color}50;
       `;
 
-      el.addEventListener("click", () => onIncidentClick(incident));
+      el.addEventListener("click", () => {
+        onIncidentClick(incident);
+        map.current?.flyTo({
+          center: [incident.lng, incident.lat],
+          zoom: 15,
+          duration: 800,
+        });
+      });
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([incident.lng, incident.lat])
         .addTo(map.current!);
 
-      markersRef.current.push(marker);
+      incidentMarkersRef.current.push(marker);
     });
   }, [incidents, onIncidentClick]);
 
