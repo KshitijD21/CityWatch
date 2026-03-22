@@ -95,6 +95,7 @@ CREATE TABLE community_reports (
   user_id UUID NOT NULL REFERENCES users(id),
   category TEXT NOT NULL CHECK (category IN ('theft', 'assault', 'vandalism', 'harassment', 'vehicle_breakin', 'disturbance', 'infrastructure', 'other')),
   description TEXT,
+  image_url TEXT,
   lat FLOAT8 NOT NULL,
   lng FLOAT8 NOT NULL,
   reported_at TIMESTAMPTZ NOT NULL DEFAULT now(),
