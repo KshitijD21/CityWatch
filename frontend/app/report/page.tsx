@@ -40,6 +40,7 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [error, setError] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -139,8 +140,8 @@ export default function ReportPage() {
         }),
       });
       setSubmitted(true);
-    } catch {
-      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit report. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -285,6 +286,12 @@ export default function ReportPage() {
             </label>
           )}
         </div>
+
+        {error && (
+          <p className="text-sm text-red-400 bg-red-400/10 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         <Button
           type="submit"
