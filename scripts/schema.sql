@@ -93,7 +93,7 @@ CREATE INDEX idx_is_incident_id ON incident_sources(incident_id);
 CREATE TABLE community_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
-  category TEXT NOT NULL CHECK (category IN ('streetlight_out', 'police_activity', 'felt_unsafe', 'disturbance', 'vehicle_breakin', 'other')),
+  category TEXT NOT NULL CHECK (category IN ('theft', 'assault', 'vandalism', 'harassment', 'vehicle_breakin', 'disturbance', 'infrastructure', 'other')),
   description TEXT,
   lat FLOAT8 NOT NULL,
   lng FLOAT8 NOT NULL,
@@ -134,3 +134,14 @@ CREATE TABLE brief_cache (
 
 CREATE INDEX idx_bc_location ON brief_cache(lat_rounded, lng_rounded);
 CREATE INDEX idx_bc_expires_at ON brief_cache(expires_at);
+
+-- RPC: Get nearby community reports within radius and time window
+CREATE OR REPLACE FUNCTION get_nearby_reports(
+  p_lat FLOAT8, p_lng FLOAT8, p_radius_miles FLOAT8 DEFAULT 0.5, p_days INT DEFAULT 7
+) RETURNS SETOF community_reports AS $$
+  SELECT * FROM community_reports
+  WHERE lat BETWEEN p_lat - (p_radius_miles * 0.0145) AND p_lat + (p_radius_miles * 0.0145)
+    AND lng BETWEEN p_lng - (p_radius_miles * 0.0175) AND p_lng + (p_radius_miles * 0.0175)
+    AND reported_at >= now() - (p_days || ' days')::interval
+  ORDER BY reported_at DESC;
+$$ LANGUAGE sql STABLE;
