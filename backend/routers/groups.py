@@ -8,7 +8,7 @@ from utils.helpers import get_current_user
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("")
 async def create_group(req: GroupCreate, token_payload: dict = Depends(get_current_user)):
     """Create group, add current user as admin."""
     user_id = token_payload["sub"]
@@ -43,7 +43,7 @@ async def create_group(req: GroupCreate, token_payload: dict = Depends(get_curre
     return {"group_id": group_id, "invite_code": invite_code}
 
 
-@router.get("/")
+@router.get("")
 async def list_groups(token_payload: dict = Depends(get_current_user)):
     """List all groups the current user belongs to."""
     user_id = token_payload["sub"]

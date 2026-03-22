@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("")
 async def submit_report(
     req: ReportCreate,
     background_tasks: BackgroundTasks,
