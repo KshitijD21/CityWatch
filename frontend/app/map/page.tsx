@@ -42,6 +42,7 @@ function MapPageContent() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberPin | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -53,11 +54,12 @@ function MapPageContent() {
   });
   const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>({});
 
-  // Get user's first group
+  // Get user's groups
   useEffect(() => {
     apiFetch('/api/groups')
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
+          setGroups(data.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name })));
           setGroupId(data[0].id || data[0].group_id);
         }
       })
@@ -184,6 +186,9 @@ function MapPageContent() {
           onToggleSource={toggleSource}
           categoryFilters={categoryFilters}
           onToggleCategory={toggleCategory}
+          groups={groups}
+          activeGroupId={groupId}
+          onSelectGroup={setGroupId}
         />
 
         {selectedIncident && (
