@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Shield, Loader2, Users, CheckCircle2 } from "lucide-react";
+import { Shield, Loader2, Users, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthContext } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -16,7 +16,10 @@ export default function JoinGroupPage() {
 
   const [status, setStatus] = useState<"loading" | "success" | "error" | "needs_auth">("loading");
   const [groupName, setGroupName] = useState("");
+  const [groupId, setGroupId] = useState("");
   const [error, setError] = useState("");
+  const [locationGranted, setLocationGranted] = useState(false);
+  const [locationAsked, setLocationAsked] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -30,6 +33,7 @@ export default function JoinGroupPage() {
     apiFetch(`/api/groups/join/${code}`)
       .then((res) => {
         setGroupName(res.group_name);
+        setGroupId(res.group_id);
         setStatus("success");
       })
       .catch((err) => {
@@ -101,6 +105,57 @@ export default function JoinGroupPage() {
                   You&apos;re now a member of this group
                 </p>
               </div>
+
+              {/* Location sharing toggle */}
+              {!locationAsked ? (
+                <div className="w-full mt-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <MapPin className="size-5 text-[#7ba4ff]" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-white">Share your location?</p>
+                      <p className="text-xs text-white/40">So your group can see where you are</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        navigator.geolocation.getCurrentPosition(
+                          () => {
+                            setLocationGranted(true);
+                            setLocationAsked(true);
+                            // Enable sharing on backend
+                            if (groupId) {
+                              apiFetch("/api/location/sharing", {
+                                method: "PUT",
+                                body: JSON.stringify({ group_id: groupId, sharing_location: true }),
+                              }).catch(() => {});
+                            }
+                          },
+                          () => {
+                            setLocationAsked(true);
+                          }
+                        );
+                      }}
+                      className="flex-1 h-9 bg-[#4d7fff] text-white hover:bg-[#5a88ff] rounded-xl text-sm font-medium cursor-pointer"
+                    >
+                      Allow
+                    </Button>
+                    <Button
+                      onClick={() => setLocationAsked(true)}
+                      variant="outline"
+                      className="flex-1 h-9 bg-white/[0.03] border-white/[0.08] text-white/50 hover:text-white/70 rounded-xl text-sm cursor-pointer"
+                    >
+                      Skip
+                    </Button>
+                  </div>
+                </div>
+              ) : locationGranted ? (
+                <p className="text-xs text-emerald-400/70 flex items-center gap-1.5">
+                  <MapPin className="size-3.5" />
+                  Location sharing enabled
+                </p>
+              ) : null}
+
               <Button
                 onClick={() => router.push("/map")}
                 className="w-full h-10 mt-2 bg-[#4d7fff] text-white hover:bg-[#5a88ff] rounded-xl text-sm font-medium cursor-pointer"
