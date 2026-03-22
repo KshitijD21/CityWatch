@@ -1,5 +1,13 @@
 # Progress Log
 
+## 2026-03-22 — Token Auto-Refresh + WebSocket Location Auto-Publish
+
+### Files Changed
+
+- `frontend/context/AuthContext.tsx` — added `insforge` import; `restoreSession()` tries `getCurrentSession()` to refresh token via httpOnly cookie before falling back to stored token; added 10-minute interval + tab focus listener to silently refresh token and keep session alive
+- `frontend/hooks/useGroupLocations.ts` — added `displayName` parameter; added auto-publish effect: connects to InsForge WebSocket, watches GPS via `navigator.geolocation.watchPosition`, publishes location to `group:{id}:locations` channel every 5 seconds via `insforge.realtime.publish()`
+- `frontend/app/map/page.tsx` — passes `user?.name` as third arg to `useGroupLocations()`
+
 ## 2026-03-22 — Fix /nearby incidents bounding box + 25-mile radius + WebGL rendering
 
 ### Files Changed
