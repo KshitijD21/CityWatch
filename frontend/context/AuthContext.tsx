@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { User } from "@/types";
 import { apiFetch } from "@/lib/api";
+import { insforge } from "@/lib/insforge";
 
 interface AuthState {
   user: User | null;
@@ -50,15 +51,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore session on mount
+  // Restore session on mount + refresh token via InsForge
   useEffect(() => {
-    const saved = localStorage.getItem("token");
-    if (saved) {
-      fetchUser(saved);
-    } else {
-      setState((s) => ({ ...s, loading: false }));
+    async function restoreSession() {
+      // Try to refresh the token via InsForge httpOnly cookie
+      const { data } = await insforge.auth.getCurrentSession().catch(() => ({ data: null }));
+      if (data?.session?.accessToken) {
+        localStorage.setItem("token", data.session.accessToken);
+        await fetchUser(data.session.accessToken);
+        return;
+      }
+      // Fall back to stored token
+      const saved = localStorage.getItem("token");
+      if (saved) {
+        fetchUser(saved);
+      } else {
+        setState((s) => ({ ...s, loading: false }));
+      }
     }
+    restoreSession();
   }, [fetchUser]);
+
+  // Auto-refresh token every 10 minutes + on tab focus to keep session alive
+  useEffect(() => {
+    async function refreshToken() {
+      const { data } = await insforge.auth.getCurrentSession().catch(() => ({ data: null }));
+      if (data?.session?.accessToken) {
+        localStorage.setItem("token", data.session.accessToken);
+      }
+    }
+
+    const interval = setInterval(refreshToken, 10 * 60 * 1000);
+
+    function onFocus() { refreshToken(); }
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   const login = useCallback(
     async (email: string, password: string) => {

@@ -12,7 +12,7 @@ interface LocationPayload {
   lng: number;
 }
 
-export function useGroupLocations(groupId: string | null, currentUserId?: string) {
+export function useGroupLocations(groupId: string | null, currentUserId?: string, displayName?: string) {
   const [members, setMembers] = useState<MemberPin[]>([]);
   const [sharing, setSharing] = useState(false);
   const watchIdRef = useRef<number | null>(null);
@@ -39,6 +39,40 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
       })
       .catch(() => {});
   }, [groupId, currentUserId]);
+
+  // Auto-publish own location via WebSocket every 5 minutes
+  useEffect(() => {
+    if (!groupId || !currentUserId) return;
+
+    const channel = `group:${groupId}:locations`;
+    const latestPos = { lat: 0, lng: 0 };
+
+    insforge.realtime.connect().catch(() => {});
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        latestPos.lat = pos.coords.latitude;
+        latestPos.lng = pos.coords.longitude;
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+
+    const intervalId = setInterval(() => {
+      if (latestPos.lat === 0 && latestPos.lng === 0) return;
+      insforge.realtime.publish(channel, "location_update", {
+        user_id: currentUserId,
+        display_name: displayName || "Unknown",
+        lat: latestPos.lat,
+        lng: latestPos.lng,
+      }).catch(() => {});
+    }, 5000);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearInterval(intervalId);
+    };
+  }, [groupId, currentUserId, displayName]);
 
   // Subscribe to realtime location updates
   useEffect(() => {
@@ -86,7 +120,7 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
     };
   }, [groupId, currentUserId]);
 
-  // Start sharing location
+  // Start sharing location (realtime publish to other clients)
   const startSharing = useCallback(
     async (groupId: string, displayName: string) => {
       try {
@@ -99,7 +133,6 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
       setSharing(true);
       const channel = `group:${groupId}:locations`;
 
-      // Publish GPS every 5 seconds
       function publishLocation(pos: GeolocationPosition) {
         const payload = {
           user_id: currentUserId || "unknown",
@@ -113,7 +146,6 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
         } catch {}
       }
 
-      // Watch position
       if (navigator.geolocation) {
         watchIdRef.current = navigator.geolocation.watchPosition(
           publishLocation,
