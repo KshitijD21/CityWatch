@@ -306,25 +306,31 @@ function PersonLocationCard({ data }: { data: PersonLocation }) {
 
 export default function ChatPage() {
   const { user } = useAuthContext();
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = sessionStorage.getItem("chat_messages");
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return sessionStorage.getItem("chat_session_id");
-  });
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
+
+  // Restore from sessionStorage on mount (client only)
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    try {
+      const saved = sessionStorage.getItem("chat_messages");
+      if (saved) setMessages(JSON.parse(saved));
+      const sid = sessionStorage.getItem("chat_session_id");
+      if (sid) setSessionId(sid);
+    } catch {}
+  }, []);
 
   // Persist messages and session to sessionStorage
   useEffect(() => {
-    sessionStorage.setItem("chat_messages", JSON.stringify(messages));
+    if (initialized.current) {
+      sessionStorage.setItem("chat_messages", JSON.stringify(messages));
+    }
   }, [messages]);
   useEffect(() => {
     if (sessionId) sessionStorage.setItem("chat_session_id", sessionId);
@@ -493,7 +499,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-dvh bg-[#08080d] text-white flex flex-col">
+    <div className="h-dvh bg-[#08080d] text-white flex justify-center">
+      <div className="w-full max-w-3xl flex flex-col border-x border-white/[0.04]">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] shrink-0">
         <Link href="/map" className="p-2 rounded-lg text-white/40 hover:text-white/70 transition-colors">
@@ -506,7 +513,8 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="max-w-2xl mx-auto space-y-4">
         {messages.length === 0 && (
           <div className="text-center py-12">
             <Shield className="size-10 text-[#4d7fff]/30 mx-auto mb-4" />
@@ -574,6 +582,7 @@ export default function ChatPage() {
           </div>
         ))}
 
+        </div>
       </div>
 
       {/* Input */}
@@ -581,7 +590,7 @@ export default function ChatPage() {
         onSubmit={handleSubmit}
         className="shrink-0 px-4 py-3 border-t border-white/[0.06]"
       >
-        <div className="flex items-center gap-2">
+        <div className="max-w-2xl mx-auto flex items-center gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -598,6 +607,7 @@ export default function ChatPage() {
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }

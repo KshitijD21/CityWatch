@@ -10,7 +10,7 @@ const features = [
     icon: Map,
     title: "Live Safety Map",
     description:
-      "Real-time incidents from police, news, and community — all on one map. See what's happening before you head out.",
+      "Real-time incidents from police, news, and community, all on one map. See what's happening before you head out.",
     className: "md:col-span-2",
   },
   {
@@ -24,7 +24,7 @@ const features = [
     icon: MessageCircle,
     title: "AI Assistant",
     description:
-      '"Is it safe to walk near campus at 11pm?" — ask anything, get real answers with sources.',
+      '"Is it safe to walk near campus at 11pm?" Ask anything, get real answers with sources.',
     className: "md:col-span-1",
   },
   {
@@ -94,7 +94,7 @@ export function BentoGrid() {
                 step: "02",
                 title: "Save your places",
                 description:
-                  "Add home, work, campus — anywhere you frequent. We'll keep watch on those areas.",
+                  "Add home, work, campus, anywhere you frequent. We'll keep watch on those areas.",
               },
               {
                 step: "03",
@@ -104,7 +104,7 @@ export function BentoGrid() {
               },
             ].map((item, i) => (
               <FadeIn key={item.step} delay={i * 150} className="text-center md:text-left">
-                <div className="text-3xl font-bold text-[#4d7fff]/20 mb-3 font-[family-name:var(--font-heading)]">
+                <div className="text-3xl font-bold text-[#4d7fff]/50 mb-3 font-[family-name:var(--font-heading)]">
                   {item.step}
                 </div>
                 <h3 className="text-base font-semibold text-white mb-2">
@@ -120,8 +120,8 @@ export function BentoGrid() {
 
         {/* CTA banner */}
         <FadeIn className="mt-32" delay={0}>
-          <div id="safety" className="relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 sm:p-16 text-center overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#4d7fff]/5 via-transparent to-[#7ba4ff]/5 pointer-events-none" />
+          <div id="safety" className="relative rounded-2xl border border-white/[0.08] p-10 sm:p-16 text-center overflow-hidden bg-gradient-to-br from-[#0f1628] via-[#111827] to-[#0c1220]">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_#4d7fff15_0%,_transparent_50%),radial-gradient(ellipse_at_bottom_left,_#7ba4ff10_0%,_transparent_50%)] pointer-events-none" />
             <h2 className="relative text-2xl sm:text-3xl font-[family-name:var(--font-heading)] text-white mb-4">
               Safety shouldn&apos;t require fear
             </h2>
