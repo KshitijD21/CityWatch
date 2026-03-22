@@ -179,6 +179,18 @@ export function MemberProfilePanel({ member, onClose }: MemberProfilePanelProps)
                     <span className={`text-xs font-medium ${cat.color}`}>{cat.label}</span>
                   </div>
 
+                  {/* Photo */}
+                  {(incident.photo_url || incident.image_url) && (
+                    <div className="relative h-28 overflow-hidden">
+                      <img
+                        src={incident.photo_url || incident.image_url}
+                        alt="Incident photo"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#12121a] to-transparent" />
+                    </div>
+                  )}
+
                   <div className="p-3">
                     {/* Description */}
                     {incident.description && (
@@ -203,9 +215,15 @@ export function MemberProfilePanel({ member, onClose }: MemberProfilePanelProps)
                         <SrcIcon className="size-3" />
                         {src.label}
                       </div>
-                      {incident.verified && (
+                      {incident.verified ? (
                         <div className="flex items-center gap-1 text-emerald-400">
                           <CheckCircle2 className="size-3" />
+                          Verified
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-yellow-400/70">
+                          <AlertTriangle className="size-3" />
+                          Unverified
                         </div>
                       )}
                     </div>

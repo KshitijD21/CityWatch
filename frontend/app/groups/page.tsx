@@ -15,6 +15,7 @@ import {
   Loader2,
   UserPlus,
   MoreVertical,
+  LogOut,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,15 @@ export default function GroupsPage() {
       // silently fail
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function leaveGroup(groupId: string) {
+    try {
+      await apiFetch(`/api/groups/${groupId}/leave`, { method: "POST" });
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    } catch {
+      // silently fail
     }
   }
 
@@ -366,6 +376,13 @@ export default function GroupsPage() {
                               Rename
                             </button>
                             <button
+                              onClick={() => { leaveGroup(group.id); setMenuOpenId(null); }}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/50 hover:bg-white/[0.05] transition-colors cursor-pointer"
+                            >
+                              <LogOut className="size-3" />
+                              Leave
+                            </button>
+                            <button
                               onClick={() => { deleteGroup(group.id); setMenuOpenId(null); }}
                               disabled={deletingId === group.id}
                               className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400/70 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
@@ -408,7 +425,7 @@ export default function GroupsPage() {
                     {/* Invite link */}
                     <div className="flex items-center gap-2 pt-4 border-t border-white/[0.06]">
                       <div className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.04]">
-                        <p className="text-[10px] text-white/20 truncate">
+                        <p className="text-[10px] text-white/80 truncate">
                           {typeof window !== "undefined" ? `${window.location.origin}/join/${group.invite_code}` : ""}
                         </p>
                       </div>

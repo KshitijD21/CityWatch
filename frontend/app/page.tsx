@@ -67,7 +67,7 @@ export default function LandingPage() {
               </h1>
             </FadeIn>
             <FadeIn delay={600}>
-              <p className="mt-5 text-base text-white/40 sm:text-lg max-w-lg mx-auto font-light tracking-[-0.01em] leading-relaxed">
+              <p className="mt-5 text-base text-white/60 sm:text-lg max-w-lg mx-auto font-light tracking-[-0.01em] leading-relaxed">
                 Real-time insights, trusted circles, and an AI assistant that tells
                 you what you need to know, without the noise or fear.
               </p>
