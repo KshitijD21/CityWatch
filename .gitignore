@@ -6,8 +6,13 @@ venv/
 .env
 .env.local
 .env.*.local
+.mcp.json
 dist/
 build/
 *.log
 .DS_Store
 .vercel
+
+# Downloaded data files (large CSVs)
+backend/scripts/data/
+scripts/data/
