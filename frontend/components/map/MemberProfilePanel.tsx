@@ -126,7 +126,7 @@ export function MemberProfilePanel({ member, onClose }: MemberProfilePanelProps)
                   : "bg-white/[0.04] text-white/30"
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400" : "bg-white/20"}`} />
-                {isOnline ? "Active now" : `Last seen ${member.updated_at ? getTimeAgo(member.updated_at) : "unknown"}`}
+                {isOnline ? "Active now" : member.updated_at ? `Last seen ${getTimeAgo(member.updated_at)}` : "Last known location"}
               </span>
             );
           })()}

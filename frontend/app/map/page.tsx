@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MapView, type MemberPin } from '@/components/map/MapView';
 import { Sidebar } from '@/components/map/Sidebar';
 import { IncidentCard } from '@/components/map/IncidentCard';
@@ -16,6 +17,9 @@ import type { Incident } from '@/types';
 
 export default function MapPage() {
   const { user } = useAuthContext();
+  const searchParams = useSearchParams();
+  const focusUserId = searchParams.get('focus');
+  const hasFocused = useRef(false);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(
     null
@@ -33,6 +37,7 @@ export default function MapPage() {
     news: true,
     community: true,
   });
+  const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>({});
 
   // Get user's first group
   useEffect(() => {
@@ -89,11 +94,15 @@ export default function MapPage() {
   }, [userLocation]);
 
   const filteredIncidents = incidents.filter(
-    (inc) => sourceFilters[inc.source] !== false
+    (inc) => sourceFilters[inc.source] !== false && categoryFilters[inc.category] !== false
   );
 
   function toggleSource(source: string) {
     setSourceFilters((prev) => ({ ...prev, [source]: !prev[source] }));
+  }
+
+  function toggleCategory(category: string) {
+    setCategoryFilters((prev) => ({ ...prev, [category]: prev[category] === false ? true : false }));
   }
 
   // Show real members, always include "You" pin
@@ -109,6 +118,16 @@ export default function MapPage() {
         ...realMembers.filter((m) => !m.isYou),
       ]
     : realMembers;
+
+  // Auto-focus on a member if ?focus=userId is in the URL
+  useEffect(() => {
+    if (!focusUserId || hasFocused.current || members.length === 0) return;
+    const target = members.find((m) => m.user_id === focusUserId);
+    if (target) {
+      hasFocused.current = true;
+      setSelectedMember(target);
+    }
+  }, [focusUserId, members]);
 
   if (!userLocation) {
     return (
@@ -146,7 +165,12 @@ export default function MapPage() {
           }}
         />
 
-        <Legend sourceFilters={sourceFilters} onToggleSource={toggleSource} />
+        <Legend
+          sourceFilters={sourceFilters}
+          onToggleSource={toggleSource}
+          categoryFilters={categoryFilters}
+          onToggleCategory={toggleCategory}
+        />
 
         {selectedIncident && (
           <IncidentCard
