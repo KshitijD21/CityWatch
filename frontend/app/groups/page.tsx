@@ -13,13 +13,16 @@ import {
   Trash2,
   X,
   Loader2,
+  UserPlus,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api";
 import type { Group } from "@/types";
 
 export default function GroupsPage() {
+  const router = useRouter();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -27,6 +30,10 @@ export default function GroupsPage() {
   const [editName, setEditName] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showJoin, setShowJoin] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState("");
 
   useEffect(() => {
     apiFetch("/api/groups")
@@ -66,6 +73,25 @@ export default function GroupsPage() {
     }
   }
 
+  async function joinGroup() {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) return;
+    setJoining(true);
+    setJoinError("");
+    try {
+      await apiFetch(`/api/groups/join/${code}`);
+      // Refresh groups list
+      const data = await apiFetch("/api/groups");
+      setGroups(Array.isArray(data) ? data : []);
+      setShowJoin(false);
+      setJoinCode("");
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : "Invalid invite code");
+    } finally {
+      setJoining(false);
+    }
+  }
+
   async function deleteGroup(groupId: string) {
     setDeletingId(groupId);
     try {
@@ -94,18 +120,61 @@ export default function GroupsPage() {
             <span className="text-sm font-semibold">My Groups</span>
           </div>
         </div>
-        <Link href="/onboarding">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            className="text-sm text-[#7ba4ff] hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
+            onClick={() => setShowJoin(!showJoin)}
+            className="text-sm text-white/50 hover:text-white/80 hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
           >
-            <Plus className="size-4 mr-1" />
-            New
+            <UserPlus className="size-4 mr-1" />
+            Join
           </Button>
-        </Link>
+          <Link href="/onboarding">
+            <Button
+              variant="ghost"
+              className="text-sm text-[#7ba4ff] hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
+            >
+              <Plus className="size-4 mr-1" />
+              New
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="px-4 py-6 max-w-lg mx-auto">
+        {/* Join group panel */}
+        {showJoin && (
+          <div className="mb-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-sm font-medium text-white/70 mb-3">
+              Enter an invite code to join a group
+            </p>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="e.g. 6VRDQW"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") joinGroup();
+                  if (e.key === "Escape") setShowJoin(false);
+                }}
+                autoFocus
+                className="flex-1 bg-white/[0.03] border-white/[0.08] text-white text-sm uppercase tracking-widest focus-visible:ring-[#4d7fff]/50"
+              />
+              <Button
+                onClick={joinGroup}
+                disabled={joining || !joinCode.trim()}
+                className="h-9 px-4 bg-[#4d7fff] text-white hover:bg-[#5a88ff] rounded-xl text-sm cursor-pointer disabled:opacity-50"
+              >
+                {joining ? <Loader2 className="size-4 animate-spin" /> : "Join"}
+              </Button>
+            </div>
+            {joinError && (
+              <p className="text-xs text-red-400 mt-2">{joinError}</p>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-5 h-5 border-2 border-[#4d7fff] border-t-transparent rounded-full animate-spin" />
