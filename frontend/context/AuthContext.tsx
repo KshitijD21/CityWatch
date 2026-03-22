@@ -46,6 +46,44 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
+/**
+ * Deduplicate concurrent refreshSession() calls to prevent CSRF token collision.
+ *
+ * InsForge rotates the CSRF token on every successful refresh. If two calls
+ * overlap (e.g. rapid page reloads, mount + interval), the second sends a stale
+ * CSRF token → 403 → cookie cleared → user logged out.
+ *
+ * This wrapper ensures only one SDK call is in-flight at a time. A localStorage
+ * cooldown (5s) prevents races across rapid page reloads where JS is torn down
+ * before the promise resolves.
+ */
+let inflightRefresh: Promise<{ accessToken: string } | null> | null = null;
+const REFRESH_COOLDOWN_MS = 5_000;
+
+async function safeRefreshSession(): Promise<{ accessToken: string } | null> {
+  const lastRefresh = localStorage.getItem('lastRefreshAt');
+  if (lastRefresh && Date.now() - Number(lastRefresh) < REFRESH_COOLDOWN_MS) {
+    const token = localStorage.getItem('token');
+    return token ? { accessToken: token } : null;
+  }
+
+  if (inflightRefresh) return inflightRefresh;
+
+  inflightRefresh = insforgeAuth.auth
+    .refreshSession()
+    .then(({ data }) => {
+      if (data?.accessToken) {
+        localStorage.setItem('lastRefreshAt', String(Date.now()));
+        return { accessToken: data.accessToken };
+      }
+      return null;
+    })
+    .catch(() => null)
+    .finally(() => { inflightRefresh = null; });
+
+  return inflightRefresh;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -69,11 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /*
    * Restore session on mount.
    *
-   * If the cached access token is still valid, uses it directly (avoids UI flash
-   * and prevents CSRF token collision on rapid page reloads). Only calls
-   * refreshSession() when the token is expired or missing — the httpOnly refresh
-   * cookie is first-party (same-origin proxy) so it persists without proactive
-   * renewal. The interval/focus effects handle renewal when the token expires.
+   * Always refreshes via safeRefreshSession() to renew the httpOnly cookie
+   * (Chrome drops cookies that aren't actively renewed). The dedup wrapper
+   * prevents CSRF token collision on rapid page reloads.
    */
   useEffect(() => {
     async function restoreSession() {
@@ -84,19 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchUser(saved);
       }
 
-      // Only refresh when token is expired/missing — avoids CSRF collision on rapid reloads.
-      // Cookie is first-party (same-origin proxy), so it persists without proactive renewal.
-      if (!saved || isTokenExpired(saved)) {
-        const { data } = await insforgeAuth.auth
-          .refreshSession()
-          .catch(() => ({ data: null }));
-        if (data?.accessToken) {
-          localStorage.setItem('token', data.accessToken);
-          await fetchUser(data.accessToken);
-          return;
-        }
+      // Always attempt refresh to renew the httpOnly cookie (deduplicated)
+      const result = await safeRefreshSession();
+      if (result?.accessToken) {
+        localStorage.setItem('token', result.accessToken);
+        await fetchUser(result.accessToken);
+        return;
+      }
 
-        // Refresh failed — user needs to re-login
+      // Refresh failed — if we had no valid cached token, user needs to re-login
+      if (!saved || isTokenExpired(saved)) {
         if (saved) localStorage.removeItem('token');
         setState((s) => ({ ...s, loading: false }));
       }
@@ -120,12 +153,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const { data } = await insforgeAuth.auth
-        .refreshSession()
-        .catch(() => ({ data: null }));
-      if (data?.accessToken) {
-        localStorage.setItem('token', data.accessToken);
-        setState((s) => s.user ? { ...s, token: data.accessToken } : s);
+      const result = await safeRefreshSession();
+      if (result?.accessToken) {
+        localStorage.setItem('token', result.accessToken);
+        setState((s) => s.user ? { ...s, token: result.accessToken } : s);
       }
     }
 
@@ -218,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Clear local token, revoke InsForge session, and reset state. */
   const logout = useCallback(() => {
     localStorage.removeItem('token');
+    localStorage.removeItem('lastRefreshAt');
     insforgeAuth.auth.signOut().catch(() => {});
     setState({ user: null, token: null, loading: false });
   }, []);
