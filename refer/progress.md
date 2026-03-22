@@ -5,8 +5,10 @@
 ### Files Changed
 
 - `frontend/context/AuthContext.tsx`
-  - `restoreSession()` — wrapped `refreshSession()` call in `if (!saved || isTokenExpired(saved))` guard so it only fires when token is expired/missing; prevents CSRF token collision when user rapidly refreshes the page
-  - Updated mount effect comment to reflect new behavior (first-party cookie persists without proactive renewal)
+  - Added `safeRefreshSession()` wrapper — deduplicates concurrent `refreshSession()` calls via module-level `inflightRefresh` promise + localStorage `lastRefreshAt` cooldown (5s); prevents CSRF token rotation collision on rapid page reloads
+  - `restoreSession()` — replaced direct `insforgeAuth.auth.refreshSession()` with `safeRefreshSession()`; still always refreshes on mount to renew httpOnly cookie
+  - `refreshToken()` (interval/focus) — same replacement with `safeRefreshSession()`
+  - `logout()` — added `localStorage.removeItem('lastRefreshAt')` cleanup
 
 ## 2026-03-22 — Chat: Multi-person card fix + formatting + address fallback
 
