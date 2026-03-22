@@ -78,10 +78,10 @@ export function IncidentCard({ incident, onClose }: IncidentCardProps) {
         </div>
 
         {/* Photo */}
-        {(incident.photo_url || incident.image_url) && (
+        {incident.photo_url && (
           <div className="relative h-36 overflow-hidden">
             <img
-              src={incident.photo_url || incident.image_url}
+              src={incident.photo_url}
               alt="Incident photo"
               className="w-full h-full object-cover"
             />
@@ -114,15 +114,10 @@ export function IncidentCard({ incident, onClose }: IncidentCardProps) {
               <SrcIcon className="size-3" />
               {src.label}
             </div>
-            {incident.verified ? (
+            {incident.verified && (
               <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-xs text-emerald-400">
                 <CheckCircle2 className="size-3" />
                 Verified
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-yellow-500/10 text-xs text-yellow-400/70">
-                <AlertTriangle className="size-3" />
-                Unverified
               </div>
             )}
             {incident.distance_miles != null && (
