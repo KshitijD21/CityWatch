@@ -33,6 +33,17 @@ cd backend && python -m venv venv && source venv/bin/activate && pip install -r 
 - Auth: InsForge issues JWT tokens. Backend validates tokens server-side via InsForge's `/api/auth/sessions/current` endpoint in `backend/utils/helpers.py`. User ID is in `payload["sub"]`
 - InsForge auth endpoints: `/api/auth/users` (signup), `/api/auth/sessions` (login), `/api/auth/oauth/{provider}` (OAuth)
 - All backend routes are prefixed with `/api/` — 9 routers: auth, incidents, chat, briefs, reports, groups, places, location, geocode
+- Realtime: InsForge handles all WebSocket infrastructure. Backend has zero WebSocket code — it only receives webhook POSTs from InsForge for DB persistence
+
+### Completed Backend Features
+
+- **B5 (Auth):** signup, login, profile CRUD, onboarding flag — `backend/routers/auth.py`
+- **B8 (Groups):** create, list, get, join via invite, add/remove members — `backend/routers/groups.py`
+- **B10 (Location):** webhook receiver, location update, get group locations, toggle sharing — `backend/routers/location.py`
+  - Uses WebSocket + webhook architecture: frontend publishes GPS via InsForge SDK WebSocket, InsForge broadcasts to subscribers and POSTs to our webhook for DB persistence
+  - InsForge realtime channel `group:%:locations` is created with webhook URL
+  - See `docs/B10_LOCATION_ARCHITECTURE.md` for full architecture
+  - InsForge upsert requires `on_conflict` parameter for tables with unique constraints (e.g., `on_conflict="user_id"` for `locations_live`)
 
 ### InsForge Integration Rules
 
@@ -42,6 +53,9 @@ cd backend && python -m venv venv && source venv/bin/activate && pip install -r 
 - SDK returns `{data, error}` for all operations
 - Database inserts require array format: `[{...}]`
 - PostgREST filters use format: `{"column": "op.value"}` (e.g., `{"id": "eq.123"}`)
+- Upsert uses `Prefer: resolution=merge-duplicates` header + `on_conflict` query param for specifying the unique constraint column
+- InsForge realtime webhook sends payload directly as JSON body (not wrapped in `{"payload": {...}}`), with metadata in headers (`X-Insforge-Channel`, `X-Insforge-Event`, `X-Insforge-Message-Id`)
+- InsForge realtime channel patterns use `%` as wildcard (not `*`), e.g., `group:%:locations`
 - Use Tailwind CSS 3.4 — **do not upgrade to v4**
 
 ### Frontend Notes
