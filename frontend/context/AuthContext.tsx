@@ -55,10 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function restoreSession() {
       // Try to refresh the token via InsForge httpOnly cookie
-      const { data } = await insforge.auth.getCurrentSession().catch(() => ({ data: null }));
-      if (data?.session?.accessToken) {
-        localStorage.setItem("token", data.session.accessToken);
-        await fetchUser(data.session.accessToken);
+      const { data } = await insforge.auth.refreshSession().catch(() => ({ data: null }));
+      if (data?.accessToken) {
+        localStorage.setItem("token", data.accessToken);
+        await fetchUser(data.accessToken);
         return;
       }
       // Fall back to stored token
@@ -75,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Auto-refresh token every 10 minutes + on tab focus to keep session alive
   useEffect(() => {
     async function refreshToken() {
-      const { data } = await insforge.auth.getCurrentSession().catch(() => ({ data: null }));
-      if (data?.session?.accessToken) {
-        localStorage.setItem("token", data.session.accessToken);
+      const { data } = await insforge.auth.refreshSession().catch(() => ({ data: null }));
+      if (data?.accessToken) {
+        localStorage.setItem("token", data.accessToken);
       }
     }
 
