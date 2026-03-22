@@ -37,7 +37,7 @@ async def create_group(req: GroupCreate, token_payload: dict = Depends(get_curre
         "user_id": user_id,
         "display_name": user_row.get("name", ""),
         "role": "admin",
-        "sharing_location": False,
+        "sharing_location": True,
     })
 
     return {"group_id": group_id, "invite_code": invite_code}
@@ -190,7 +190,7 @@ async def join_group(invite_code: str, token_payload: dict = Depends(get_current
             "user_id": user_id,
             "display_name": display_name,
             "role": "member",
-            "sharing_location": False,
+            "sharing_location": True,
         })
 
     return {"group_id": group_id, "group_name": group["name"]}
@@ -209,7 +209,7 @@ async def add_member(
         "display_name": req.display_name,
         "age_band": req.age_band,
         "role": "member",
-        "sharing_location": False,
+        "sharing_location": True,
     })
 
     return member
