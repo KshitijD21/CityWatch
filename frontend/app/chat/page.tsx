@@ -552,7 +552,11 @@ export default function ChatPage() {
                   {msg.personLocation && <PersonLocationCard data={msg.personLocation} />}
                 </>
               ) : (
-                <Loader2 className="size-4 text-white/30 animate-spin" />
+                <span className="flex items-center gap-1 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce [animation-delay:300ms]" />
+                </span>
               )}
             </div>
             {msg.role === "user" && (

@@ -19,7 +19,7 @@ import { useAuthContext } from "@/context/AuthContext";
 
 const navItems = [
   { icon: Map, label: "Map", href: "/map" },
-  { icon: ShieldCheck, label: "Brief", href: "/brief" },
+  { icon: ShieldCheck, label: "Safety Brief", href: "/brief" },
   { icon: FileText, label: "Report", href: "/report" },
   { icon: MessageCircle, label: "Ask AI", href: "/chat" },
   { icon: Users, label: "Groups", href: "/groups" },

@@ -229,6 +229,28 @@ export function MapView({
         },
       });
 
+      // 10-mile radius circle around user
+      const radiusKm = 10 * 1.60934;
+      const circle = createGeoJSONCircle([center.lng, center.lat], radiusKm);
+      m.addSource('radius-circle', { type: 'geojson', data: circle });
+      m.addLayer({
+        id: 'radius-fill',
+        type: 'fill',
+        source: 'radius-circle',
+        paint: { 'fill-color': '#4d7fff', 'fill-opacity': 0.06 },
+      });
+      m.addLayer({
+        id: 'radius-border',
+        type: 'line',
+        source: 'radius-circle',
+        paint: {
+          'line-color': '#6c9cff',
+          'line-opacity': 0.45,
+          'line-width': 2,
+          'line-dasharray': [3, 2],
+        },
+      });
+
       mapReady.current = true;
 
       // If incidents were set before map loaded, apply them now
@@ -313,59 +335,6 @@ export function MapView({
       memberMarkersRef.current.push(marker);
     });
   }, [members, onMemberClick]);
-
-  // Incident markers
-  useEffect(() => {
-    if (!map.current) return;
-
-    incidentMarkersRef.current.forEach((m) => m.remove());
-    incidentMarkersRef.current = [];
-
-    incidents.forEach((incident) => {
-      const color = CATEGORY_COLORS[incident.category] || '#6b7280';
-      const isCommunity = incident.source === 'community';
-      const el = document.createElement('div');
-
-      if (isCommunity) {
-        // Diamond shape for community reports
-        el.style.cssText = `
-          width: 12px;
-          height: 12px;
-          background: ${color};
-          border: 2px solid rgba(255,255,255,0.3);
-          transform: rotate(45deg);
-          cursor: pointer;
-          box-shadow: 0 0 8px ${color}60;
-        `;
-      } else {
-        // Circle for police/news
-        el.style.cssText = `
-          width: 10px;
-          height: 10px;
-          background: ${color};
-          border: 1.5px solid rgba(0,0,0,0.4);
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 0 6px ${color}50;
-        `;
-      }
-
-      el.addEventListener('click', () => {
-        onIncidentClick(incident);
-        map.current?.flyTo({
-          center: [incident.lng, incident.lat],
-          zoom: 15,
-          duration: 800,
-        });
-      });
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([incident.lng, incident.lat])
-        .addTo(map.current!);
-
-      incidentMarkersRef.current.push(marker);
-    });
-  }, [incidents, onIncidentClick]);
 
   return <div ref={mapContainer} className="w-full h-full" />;
 }
