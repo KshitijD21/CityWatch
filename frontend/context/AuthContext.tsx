@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, loading: false }));
       }
     }
+    restoreSession();
   }, [fetchUser]);
 
   // Keep session alive — re-validate token on tab focus
