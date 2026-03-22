@@ -1,5 +1,10 @@
 # Progress Log
 
+## 2026-03-22 — Logout Functionality
+
+### Files Changed
+- `frontend/components/map/Sidebar.tsx` — added profile popover with user name/email display and logout button; imports `useState`, `useRef`, `useEffect`, `useRouter`, `LogOut` icon, `useAuthContext`; `handleLogout()` calls `logout()` from AuthContext and redirects to `/login`; popover closes on outside click
+
 ## 2026-03-22 — B6: AI Verification Service (Steps 1-8)
 
 ### Files Changed
