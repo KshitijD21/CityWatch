@@ -10,7 +10,7 @@ from utils.helpers import get_current_user
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("")
 async def submit_report(
     req: ReportCreate,
     token_payload: dict = Depends(get_current_user),

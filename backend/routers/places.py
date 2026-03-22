@@ -2,12 +2,12 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("")
 async def add_place():
     """Add saved place."""
     return {"message": "TODO"}
 
-@router.get("/")
+@router.get("")
 async def list_places():
     """List saved places."""
     return {"message": "TODO"}

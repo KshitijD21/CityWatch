@@ -55,7 +55,7 @@ export default function ChatPage() {
       };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${API_URL}/api/chat/`, {
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers,
         body: JSON.stringify({
