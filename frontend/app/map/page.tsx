@@ -67,18 +67,13 @@ export default function MapPage() {
       .catch(() => {});
   }, [userLocation]);
 
-  // Use real members if available, otherwise demo data
-  const members: MemberPin[] =
-    realMembers.length > 0
-      ? realMembers
-      : userLocation
-      ? [
-          { name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
-          { name: "Ronak", lat: userLocation.lat + 0.008, lng: userLocation.lng - 0.012 },
-          { name: "Kshitij", lat: userLocation.lat - 0.005, lng: userLocation.lng + 0.015 },
-          { name: "Sarah", lat: userLocation.lat + 0.012, lng: userLocation.lng + 0.008 },
-        ]
-      : [];
+  // Show real members, always include "You" pin
+  const members: MemberPin[] = userLocation
+    ? [
+        { name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
+        ...realMembers.filter((m) => !m.isYou),
+      ]
+    : realMembers;
 
   if (!userLocation) {
     return (
