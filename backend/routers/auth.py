@@ -1,8 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models.schemas import (
-    SignupRequest,
-    LoginRequest,
-    AuthResponse,
     UserProfile,
     UserUpdateRequest,
     InitProfileRequest,
@@ -11,67 +8,6 @@ from services.insforge_service import insforge
 from utils.helpers import get_current_user
 
 router = APIRouter()
-
-
-@router.post("/signup", response_model=AuthResponse)
-async def signup(req: SignupRequest):
-    """Create account via InsForge auth, then store profile in users table."""
-    # 1. Create auth user in InsForge
-    auth_result = await insforge.sign_up(req.email, req.password, req.name)
-
-    user_id = auth_result.get("user", {}).get("id")
-    access_token = auth_result.get("accessToken", "")
-    if not user_id:
-        raise HTTPException(status_code=500, detail="Signup failed: no user id returned")
-
-    # 2. Insert profile row in users table
-    await insforge.insert("users", {
-        "id": user_id,
-        "email": req.email,
-        "name": req.name,
-        "age_band": req.age_band,
-        "onboarded": False,
-    })
-
-    return AuthResponse(user_id=user_id, token=access_token, onboarded=False)
-
-
-@router.post("/login", response_model=AuthResponse)
-async def login(req: LoginRequest):
-    """Log in with email+password or Google token."""
-    # 1. Authenticate via InsForge
-    if req.google_token:
-        auth_result = await insforge.sign_in_google(req.google_token)
-    else:
-        auth_result = await insforge.sign_in_password(req.email, req.password)
-
-    user_id = auth_result.get("user", {}).get("id")
-    access_token = auth_result.get("accessToken", "")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication failed")
-
-    # 2. Get onboarded status from users table
-    try:
-        user_row = await insforge.query(
-            "users",
-            select="onboarded",
-            filters={"id": f"eq.{user_id}"},
-            single=True,
-        )
-        onboarded = user_row.get("onboarded", False)
-    except HTTPException:
-        # First Google OAuth login — user row doesn't exist yet
-        email = auth_result.get("user", {}).get("email", "")
-        await insforge.insert("users", {
-            "id": user_id,
-            "email": email,
-            "name": email.split("@")[0],
-            "age_band": "adult",
-            "onboarded": False,
-        })
-        onboarded = False
-
-    return AuthResponse(user_id=user_id, token=access_token, onboarded=onboarded)
 
 
 @router.post("/init")
