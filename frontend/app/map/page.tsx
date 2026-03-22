@@ -32,6 +32,13 @@ export default function MapPage() {
   const { members: realMembers, sharing, startSharing, stopSharing } =
     useGroupLocations(groupId, user?.id);
 
+  // Auto-start location sharing when group and user are available
+  useEffect(() => {
+    if (groupId && user && !sharing) {
+      startSharing(groupId, user.name || "Unknown");
+    }
+  }, [groupId, user]);
+
   // Get user location with fast fallback
   useEffect(() => {
     const fallback = setTimeout(() => {
