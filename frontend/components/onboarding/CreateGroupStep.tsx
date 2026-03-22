@@ -8,13 +8,11 @@ import { apiFetch } from "@/lib/api";
 
 const GROUP_TYPES = [
   { value: "family", label: "Family" },
-  { value: "travel", label: "Trip / Travel" },
-  { value: "roommates", label: "Roommates" },
   { value: "friends", label: "Friends" },
 ];
 
 interface CreateGroupStepProps {
-  onContinue: (groupId: string, groupName: string) => void;
+  onContinue: (groupId: string, groupName: string, inviteCode: string) => void;
 }
 
 export function CreateGroupStep({ onContinue }: CreateGroupStepProps) {
@@ -33,10 +31,9 @@ export function CreateGroupStep({ onContinue }: CreateGroupStepProps) {
         method: "POST",
         body: JSON.stringify({ name: name.trim(), type }),
       });
-      onContinue(res.id || res.groupId, name.trim());
-    } catch {
-      // Demo fallback — continue without backend
-      onContinue("demo-group-id", name.trim());
+      onContinue(res.group_id, name.trim(), res.invite_code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create group");
     } finally {
       setLoading(false);
     }

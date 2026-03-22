@@ -6,23 +6,24 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Copy, Check, Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
-const ROLES = ["Adult", "Teen", "Child"];
+const AGE_BANDS = ["Adult", "Teen", "Child"];
 
 interface Member {
   name: string;
-  role: string;
+  ageBand: string;
 }
 
 interface AddMembersStepProps {
   groupId: string | null;
   groupName: string;
+  inviteCode: string | null;
   onContinue: () => void;
 }
 
-export function AddMembersStep({ groupId, groupName, onContinue }: AddMembersStepProps) {
+export function AddMembersStep({ groupId, groupName, inviteCode, onContinue }: AddMembersStepProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState("Adult");
+  const [newAgeBand, setNewAgeBand] = useState("Adult");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -30,21 +31,22 @@ export function AddMembersStep({ groupId, groupName, onContinue }: AddMembersSte
     if (!newName.trim()) return;
 
     // Add locally immediately
-    setMembers((prev) => [...prev, { name: newName.trim(), role: newRole }]);
+    setMembers((prev) => [...prev, { name: newName.trim(), ageBand: newAgeBand }]);
     const savedName = newName.trim();
+    const savedAgeBand = newAgeBand.toLowerCase();
     setNewName("");
 
     // Fire-and-forget API call
     if (groupId) {
       apiFetch(`/api/groups/${groupId}/members`, {
         method: "POST",
-        body: JSON.stringify({ name: savedName, role: newRole.toLowerCase() }),
+        body: JSON.stringify({ display_name: savedName, age_band: savedAgeBand }),
       }).catch(() => {});
     }
   }
 
   function copyInviteLink() {
-    const link = `${window.location.origin}/join/${groupId}`;
+    const link = `${window.location.origin}/join/${inviteCode || groupId}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -71,7 +73,7 @@ export function AddMembersStep({ groupId, groupName, onContinue }: AddMembersSte
               className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]"
             >
               <span className="text-sm text-white/80">{m.name}</span>
-              <span className="text-xs text-white/30">{m.role}</span>
+              <span className="text-xs text-white/30">{m.ageBand}</span>
             </div>
           ))}
         </div>
@@ -90,11 +92,11 @@ export function AddMembersStep({ groupId, groupName, onContinue }: AddMembersSte
             />
           </div>
           <select
-            value={newRole}
-            onChange={(e) => setNewRole(e.target.value)}
+            value={newAgeBand}
+            onChange={(e) => setNewAgeBand(e.target.value)}
             className="h-9 px-3 rounded-lg bg-white/[0.03] border border-white/[0.08] text-sm text-white/70 outline-none"
           >
-            {ROLES.map((r) => (
+            {AGE_BANDS.map((r) => (
               <option key={r} value={r} className="bg-[#08080d]">
                 {r}
               </option>

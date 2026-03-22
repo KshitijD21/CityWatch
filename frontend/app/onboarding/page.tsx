@@ -7,6 +7,7 @@ import { EthicsStep } from "@/components/onboarding/EthicsStep";
 import { CreateGroupStep } from "@/components/onboarding/CreateGroupStep";
 import { AddMembersStep } from "@/components/onboarding/AddMembersStep";
 import { AddPlacesStep } from "@/components/onboarding/AddPlacesStep";
+import { apiFetch } from "@/lib/api";
 
 const TOTAL_STEPS = 4;
 
@@ -42,9 +43,16 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
-  function next() {
+  async function next() {
     if (step >= TOTAL_STEPS - 1) {
+      // Mark onboarding complete before navigating
+      try {
+        await apiFetch("/api/auth/me/onboarded", { method: "PUT" });
+      } catch {
+        // Continue to map even if this fails
+      }
       router.push("/map");
     } else {
       setStep((s) => s + 1);
@@ -120,9 +128,10 @@ export default function OnboardingPage() {
             {step === 0 && <EthicsStep onContinue={next} />}
             {step === 1 && (
               <CreateGroupStep
-                onContinue={(id, name) => {
+                onContinue={(id, name, code) => {
                   setGroupId(id);
                   setGroupName(name);
+                  setInviteCode(code);
                   next();
                 }}
               />
@@ -131,6 +140,7 @@ export default function OnboardingPage() {
               <AddMembersStep
                 groupId={groupId}
                 groupName={groupName}
+                inviteCode={inviteCode}
                 onContinue={next}
               />
             )}

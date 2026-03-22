@@ -88,7 +88,7 @@ export function AddPlacesStep({ onContinue }: AddPlacesStepProps) {
       }
 
       for (const place of toSave) {
-        await apiFetch("/api/users/places", {
+        await apiFetch("/api/places", {
           method: "POST",
           body: JSON.stringify(place),
         }).catch(() => {});
