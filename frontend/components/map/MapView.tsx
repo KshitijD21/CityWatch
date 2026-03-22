@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import type { Incident } from "@/types";
 
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+// Free dark tile style (no API key needed)
+const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 const CATEGORY_COLORS: Record<string, string> = {
   theft: "#ef4444",
@@ -26,31 +27,38 @@ interface MapViewProps {
 
 export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const map = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
 
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    map.current = new mapboxgl.Map({
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: DARK_STYLE,
       center: [center.lng, center.lat],
       zoom: 13,
       attributionControl: false,
     });
 
     // Add user location dot
-    new mapboxgl.Marker({
-      color: "#4d7fff",
-      scale: 0.8,
-    })
+    const userEl = document.createElement("div");
+    userEl.style.cssText = `
+      width: 16px;
+      height: 16px;
+      background: #4d7fff;
+      border: 3px solid #1a1a2e;
+      border-radius: 50%;
+      box-shadow: 0 0 12px rgba(77, 127, 255, 0.5);
+    `;
+
+    new maplibregl.Marker({ element: userEl })
       .setLngLat([center.lng, center.lat])
       .addTo(map.current);
 
     map.current.addControl(
-      new mapboxgl.NavigationControl({ showCompass: false }),
+      new maplibregl.NavigationControl({ showCompass: false }),
       "bottom-right"
     );
 
@@ -71,7 +79,6 @@ export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
     incidents.forEach((incident) => {
       const color = CATEGORY_COLORS[incident.category] || "#6b7280";
       const el = document.createElement("div");
-      el.className = "incident-marker";
       el.style.cssText = `
         width: 14px;
         height: 14px;
@@ -84,7 +91,7 @@ export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
 
       el.addEventListener("click", () => onIncidentClick(incident));
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat([incident.lng, incident.lat])
         .addTo(map.current!);
 
@@ -92,7 +99,5 @@ export function MapView({ center, incidents, onIncidentClick }: MapViewProps) {
     });
   }, [incidents, onIncidentClick]);
 
-  return (
-    <div ref={mapContainer} className="absolute inset-0" />
-  );
+  return <div ref={mapContainer} className="w-full h-full" />;
 }
