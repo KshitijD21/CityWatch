@@ -49,7 +49,7 @@ export default function MapPage() {
     sharing,
     startSharing,
     stopSharing,
-  } = useGroupLocations(groupId, user?.id);
+  } = useGroupLocations(groupId, user?.id, user?.name);
 
   // Get user location with fast fallback
   useEffect(() => {
