@@ -12,7 +12,7 @@ export interface User {
 export interface Group {
   id: string;
   name: string;
-  type: 'family' | 'trip';
+  type: 'family' | 'friends';
   invite_code: string;
   created_by: string;
   created_at: string;

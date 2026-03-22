@@ -1,3 +1,8 @@
+-- Migration: 001_initial_schema
+-- Created: 2026-03-21
+-- Description: Create all initial tables and indexes
+-- Status: APPLIED
+
 -- Users table
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -54,7 +59,7 @@ CREATE TABLE saved_places (
 CREATE INDEX idx_sp_user_id ON saved_places(user_id);
 CREATE INDEX idx_sp_lat_lng ON saved_places(lat, lng);
 
--- Incidents table (THE MAIN TABLE)
+-- Incidents table
 CREATE TABLE incidents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category TEXT NOT NULL CHECK (category IN ('theft', 'assault', 'vandalism', 'harassment', 'vehicle_breakin', 'disturbance', 'infrastructure', 'other')),
