@@ -20,6 +20,11 @@ export async function apiFetch(path: string, options?: RequestInit) {
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     const message = body?.detail || `API error: ${res.status}`;
+    // Clear expired token and redirect to login on 401
+    if (res.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
     throw new Error(message);
   }
 
