@@ -1,5 +1,12 @@
 # Progress Log
 
+## 2026-03-22 — README: add team section with DiceBear avatars
+
+### Files Changed
+
+- `README.md`
+  - Added Team section with HTML table: 4 members (Kshitij, Anirudh, Ronak, Yash) with DiceBear thumbs avatars (same seed/color pattern as app) and LinkedIn profile links
+
 ## 2026-03-22 — Fix: skip onboarding for users already in a group
 
 ### Files Changed
