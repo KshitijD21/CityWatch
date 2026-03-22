@@ -26,11 +26,13 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
       .then((data) => {
         if (Array.isArray(data)) {
           setMembers(
-            data.map((m: { user_id: string; display_name: string; lat: number; lng: number }) => ({
+            data.map((m: { user_id: string; display_name: string; lat: number; lng: number; updated_at?: string }) => ({
+              user_id: m.user_id,
               name: m.display_name || "Unknown",
               lat: m.lat,
               lng: m.lng,
               isYou: m.user_id === currentUserId,
+              updated_at: m.updated_at,
             }))
           );
         }
@@ -55,6 +57,7 @@ export function useGroupLocations(groupId: string | null, currentUserId?: string
               (m) => m.name === payload.display_name
             );
             const pin: MemberPin = {
+              user_id: payload.user_id,
               name: payload.display_name,
               lat: payload.lat,
               lng: payload.lng,

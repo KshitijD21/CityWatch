@@ -1,5 +1,18 @@
 # Progress Log
 
+## 2026-03-22 — Member Profile Panel (click user on map)
+
+### Files Added
+
+- `frontend/components/map/MemberProfilePanel.tsx` — `MemberProfilePanel` component: right-side sliding panel showing member avatar (dicebear), name, reverse-geocoded address (progressive Mapbox type sets with lat/lng fallback), last seen timestamp, and last 7 days nearby incidents as cards; fetches incidents from `/api/incidents/nearby` with `days=7` and `radius=2`; incident cards show category, description, time ago, distance, source, verified badge
+
+### Files Changed
+
+- `frontend/components/map/MapView.tsx` — added `user_id?` and `updated_at?` to `MemberPin` interface; added `onMemberClick?` callback to `MapViewProps`; wired click listener on member marker elements
+- `frontend/hooks/useGroupLocations.ts` — included `user_id` and `updated_at` in `MemberPin` for both REST fetch and realtime updates
+- `frontend/app/map/page.tsx` — added `selectedMember` state; imported `MemberProfilePanel`; passed `onMemberClick` to `MapView` (clears selected incident when opening); renders `MemberProfilePanel` when a member is selected; added `user_id` to "You" pin
+- `frontend/app/globals.css` — added `@keyframes slide-in-right` and `.animate-slide-in-right` CSS animation for panel entrance
+
 ## 2026-03-22 — Logout Functionality
 
 ### Files Changed

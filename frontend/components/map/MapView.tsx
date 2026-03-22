@@ -19,10 +19,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export interface MemberPin {
+  user_id?: string;
   name: string;
   lat: number;
   lng: number;
   isYou?: boolean;
+  updated_at?: string;
 }
 
 interface MapViewProps {
@@ -30,6 +32,7 @@ interface MapViewProps {
   incidents: Incident[];
   members: MemberPin[];
   onIncidentClick: (incident: Incident) => void;
+  onMemberClick?: (member: MemberPin) => void;
 }
 
 function avatarUrl(name: string): string {
@@ -80,7 +83,7 @@ function createMemberMarker(member: MemberPin): HTMLDivElement {
   return wrapper;
 }
 
-export function MapView({ center, incidents, members, onIncidentClick }: MapViewProps) {
+export function MapView({ center, incidents, members, onIncidentClick, onMemberClick }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const incidentMarkersRef = useRef<maplibregl.Marker[]>([]);
@@ -118,12 +121,15 @@ export function MapView({ center, incidents, members, onIncidentClick }: MapView
 
     members.forEach((member) => {
       const el = createMemberMarker(member);
+      if (onMemberClick) {
+        el.addEventListener("click", () => onMemberClick(member));
+      }
       const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([member.lng, member.lat])
         .addTo(map.current!);
       memberMarkersRef.current.push(marker);
     });
-  }, [members]);
+  }, [members, onMemberClick]);
 
   // Incident markers
   useEffect(() => {

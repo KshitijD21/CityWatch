@@ -117,6 +117,15 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
