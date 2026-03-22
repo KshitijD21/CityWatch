@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api";
-import type { Group } from "@/types";
+import type { Group, GroupMember } from "@/types";
 
 export default function GroupsPage() {
   const router = useRouter();
@@ -30,6 +30,7 @@ export default function GroupsPage() {
   const [editName, setEditName] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Record<string, GroupMember[]>>({});
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
@@ -37,7 +38,23 @@ export default function GroupsPage() {
 
   useEffect(() => {
     apiFetch("/api/groups")
-      .then((data) => setGroups(Array.isArray(data) ? data : []))
+      .then(async (data) => {
+        const groupList = Array.isArray(data) ? data : [];
+        setGroups(groupList);
+        // Fetch members for each group
+        const memberMap: Record<string, GroupMember[]> = {};
+        await Promise.all(
+          groupList.map(async (g: Group) => {
+            try {
+              const detail = await apiFetch(`/api/groups/${g.id}`);
+              memberMap[g.id] = detail.members || [];
+            } catch {
+              memberMap[g.id] = [];
+            }
+          })
+        );
+        setMembers(memberMap);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -242,6 +259,26 @@ export default function GroupsPage() {
                         {group.type}
                       </span>
                     </div>
+
+                    {/* Members */}
+                    {members[group.id]?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2 mb-3">
+                        {members[group.id].map((m) => (
+                          <div
+                            key={m.id}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06]"
+                          >
+                            <div className="w-5 h-5 rounded-full bg-[#4d7fff]/20 flex items-center justify-center text-[10px] font-medium text-[#7ba4ff]">
+                              {m.display_name?.charAt(0)?.toUpperCase() || "?"}
+                            </div>
+                            <span className="text-xs text-white/50">{m.display_name}</span>
+                            {m.role === "admin" && (
+                              <span className="text-[10px] text-[#7ba4ff]/60">admin</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex items-center gap-2 mt-3">
                       <button
