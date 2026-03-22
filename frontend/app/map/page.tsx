@@ -1,43 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthContext } from "@/context/AuthContext";
 import { MapView } from "@/components/map/MapView";
-import { BottomBar } from "@/components/map/BottomBar";
-import { TopBar } from "@/components/map/TopBar";
+import { Sidebar } from "@/components/map/Sidebar";
 import { IncidentCard } from "@/components/map/IncidentCard";
 import { apiFetch } from "@/lib/api";
 import type { Incident } from "@/types";
 
 export default function MapPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuthContext();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // TODO: Re-enable auth guard after hackathon demo
-  // useEffect(() => {
-  //   if (!authLoading && !user) {
-  //     router.push("/login");
-  //   }
-  // }, [user, authLoading, router]);
-
-  // Get user location
+  // Get user location with fast fallback
   useEffect(() => {
+    const fallback = setTimeout(() => {
+      setUserLocation((prev) => prev ?? { lat: 33.4255, lng: -111.94 });
+    }, 2000);
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        clearTimeout(fallback);
         setUserLocation({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         });
       },
       () => {
-        // Default to Phoenix, AZ (ASU area)
-        setUserLocation({ lat: 33.4255, lng: -111.9400 });
-      }
+        clearTimeout(fallback);
+        setUserLocation({ lat: 33.4255, lng: -111.94 });
+      },
+      { timeout: 5000 }
     );
+
+    return () => clearTimeout(fallback);
   }, []);
 
   // Fetch nearby incidents
@@ -60,23 +56,25 @@ export default function MapPage() {
   }
 
   return (
-    <div className="h-dvh w-full relative overflow-hidden">
-      <TopBar />
+    <div className="h-dvh w-full flex bg-[#08080d]">
+      {/* Sidebar */}
+      <Sidebar incidentCount={incidents.length} />
 
-      <MapView
-        center={userLocation}
-        incidents={incidents}
-        onIncidentClick={setSelectedIncident}
-      />
-
-      {selectedIncident && (
-        <IncidentCard
-          incident={selectedIncident}
-          onClose={() => setSelectedIncident(null)}
+      {/* Map area */}
+      <div className="flex-1 relative">
+        <MapView
+          center={userLocation}
+          incidents={incidents}
+          onIncidentClick={setSelectedIncident}
         />
-      )}
 
-      <BottomBar />
+        {selectedIncident && (
+          <IncidentCard
+            incident={selectedIncident}
+            onClose={() => setSelectedIncident(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }
