@@ -1,5 +1,13 @@
 # Progress Log
 
+## 2026-03-22 — Fix: CSRF token collision on rapid page refresh
+
+### Files Changed
+
+- `frontend/context/AuthContext.tsx`
+  - `restoreSession()` — wrapped `refreshSession()` call in `if (!saved || isTokenExpired(saved))` guard so it only fires when token is expired/missing; prevents CSRF token collision when user rapidly refreshes the page
+  - Updated mount effect comment to reflect new behavior (first-party cookie persists without proactive renewal)
+
 ## 2026-03-22 — Chat: Multi-person card fix + formatting + address fallback
 
 ### Files Changed

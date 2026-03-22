@@ -69,11 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /*
    * Restore session on mount.
    *
-   * Always calls refreshSession() via the same-origin proxy (insforgeAuth) to
-   * renew the httpOnly refresh cookie on every page load. This is necessary
-   * because Chrome drops cookies that aren't actively renewed, even first-party
-   * ones set through a proxy. The localStorage token is used as an immediate
-   * fallback so the UI doesn't flash while the refresh call is in flight.
+   * If the cached access token is still valid, uses it directly (avoids UI flash
+   * and prevents CSRF token collision on rapid page reloads). Only calls
+   * refreshSession() when the token is expired or missing — the httpOnly refresh
+   * cookie is first-party (same-origin proxy) so it persists without proactive
+   * renewal. The interval/focus effects handle renewal when the token expires.
    */
   useEffect(() => {
     async function restoreSession() {
@@ -84,18 +84,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchUser(saved);
       }
 
-      // Always attempt refresh to renew the httpOnly cookie
-      const { data } = await insforgeAuth.auth
-        .refreshSession()
-        .catch(() => ({ data: null }));
-      if (data?.accessToken) {
-        localStorage.setItem('token', data.accessToken);
-        await fetchUser(data.accessToken);
-        return;
-      }
-
-      // Refresh failed — if we had no valid cached token, user needs to re-login
+      // Only refresh when token is expired/missing — avoids CSRF collision on rapid reloads.
+      // Cookie is first-party (same-origin proxy), so it persists without proactive renewal.
       if (!saved || isTokenExpired(saved)) {
+        const { data } = await insforgeAuth.auth
+          .refreshSession()
+          .catch(() => ({ data: null }));
+        if (data?.accessToken) {
+          localStorage.setItem('token', data.accessToken);
+          await fetchUser(data.accessToken);
+          return;
+        }
+
+        // Refresh failed — user needs to re-login
         if (saved) localStorage.removeItem('token');
         setState((s) => ({ ...s, loading: false }));
       }
