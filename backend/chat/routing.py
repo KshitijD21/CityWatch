@@ -21,6 +21,7 @@ def classify_lane(
     message: str,
     session: SessionState,
     group_member_names: list[str] | None = None,
+    group_names: list[str] | None = None,
 ) -> int:
     """Determine which lane to route a message to.
     Returns 1 (simple location) or 2 (people/ReAct).
@@ -37,6 +38,12 @@ def classify_lane(
             # Also check first name alone (for multi-word display names)
             first = name_lower.split()[0] if name_lower else ""
             if first and len(first) >= 3 and first in msg_lower:
+                return 2
+
+    # Check if any group name appears in the message (e.g. "ASU hackathon members")
+    if group_names:
+        for gname in group_names:
+            if gname.lower() in msg_lower:
                 return 2
 
     # Check for Lane 2 keywords

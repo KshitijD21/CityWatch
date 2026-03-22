@@ -1,5 +1,41 @@
 # Progress Log
 
+## 2026-03-22 — Chat: Multi-person card fix + formatting + address fallback
+
+### Files Changed
+
+- `backend/chat/handler.py`
+  - `handle_lane2()` — skip person card for multi-person queries ("each of them", "all members", "everyone"); use pre-fetched address for card instead of resolved_loc_name; improved raw-coord regex fallback
+- `backend/chat/prompts.py`
+  - `REACT_SYSTEM_PROMPT` — added FORMATTING RULES FOR MULTI-PERSON QUERIES: clear headers per person, exact N incidents per person (no duplicates), incidents grouped under each person
+  - `REACT_SYSTEM_PROMPT` — reinforced address usage: always use "address" field from PRE-FETCHED LIVE LOCATIONS, never say "their last known area" when address is available
+  - `build_react_prompt()` — pre-fetched locations now include `coords=(lat, lng)` so LLM can pass correct per-person coordinates to `get_nearby_incidents`
+- `frontend/app/chat/page.tsx`
+  - `PersonLocationCard` — detects raw lat/lng coordinates in address and shows "Location available on map" instead
+
+## 2026-03-22 — Chat: Group member cards + person card fix
+
+### Files Changed
+
+- `backend/chat/data_access.py`
+  - `get_group_members()` — now includes `group_name` on each member dict; deduplicates by `(id, group_id)` instead of just `id` so same person in multiple groups is preserved
+  - `get_user_groups()` — new function returning list of groups the user belongs to with `id`, `name`, `type`, `member_count`, `role`
+- `backend/chat/prompts.py`
+  - `build_react_prompt()` — organizes pre-fetched members by group name instead of flat list
+  - `REACT_SYSTEM_PROMPT` — added MULTIPLE GROUPS instruction: tell user which groups they're in, list members per group
+- `backend/chat/handler.py`
+  - `_is_group_list_query()` — detects simple group listing queries; rejects complex queries (containing "where", "safe", "incident", etc.) so they go to Lane 2
+  - `_handle_group_list()` — returns structured `group_members` event; filters to specific group when user mentions a group name, otherwise shows all groups
+  - `handle_chat()` — extracts `group_names` from cached_members; passes to `classify_lane()` and `_is_group_list_query()`; shortcircuits simple group list queries before lane routing
+  - `handle_lane2()` person card — only emits `person_location` card when user's message explicitly mentions a person AND that person has real lat/lng in DB
+- `backend/chat/routing.py`
+  - `classify_lane()` — added `group_names` parameter; routes to Lane 2 when message contains a known group name (e.g., "ASU hackathon members, find where each...")
+- `frontend/app/chat/page.tsx`
+  - Added `GroupMember`, `GroupData`, `GroupMembersData` interfaces
+  - `GroupMembersCards` component — renders each group as a card with header (name, member count) and member rows (avatar, name, admin badge)
+  - SSE handler — processes `group_members` event type
+  - Message rendering — prioritizes `groupMembers` display over other card types
+
 ## 2026-03-22 — SDK-First Auth + Refresh Token Fix
 
 ### Files Added

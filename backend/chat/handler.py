@@ -495,9 +495,14 @@ async def handle_lane2(
                         if loc.get("lat") and loc.get("lng"):
                             try:
                                 addr = await geocoding.reverse_geocode(loc["lat"], loc["lng"])
-                                loc["address"] = addr
+                                # Check if reverse geocode returned raw coords
+                                import re as _re
+                                if addr and not _re.match(r'^-?\d+\.\d+,?\s*-?\d+\.\d+$', addr.strip()):
+                                    loc["address"] = addr
+                                else:
+                                    loc["address"] = f"near {name}'s last shared location"
                             except Exception:
-                                loc["address"] = f"{loc['lat']:.4f}, {loc['lng']:.4f}"
+                                loc["address"] = f"near {name}'s last shared location"
                         # Compute relative time + staleness
                         updated = loc.get("updated_at", "")
                         if updated:
@@ -557,8 +562,15 @@ async def handle_lane2(
 
     # Extract person name mentioned for follow-up context
     mentioned_person = None
-    if prefetched_members:
-        msg_lower = message.lower()
+    # Multi-person queries (e.g. "each of them", "all members") → no single person card
+    multi_person_phrases = [
+        "each of them", "all member", "every member", "everyone",
+        "each member", "each person", "all of them", "where is everyone",
+    ]
+    msg_lower = message.lower()
+    is_multi_person = any(phrase in msg_lower for phrase in multi_person_phrases)
+
+    if prefetched_members and not is_multi_person:
         for member in prefetched_members:
             name = member.get("display_name", "")
             if not name:
@@ -609,27 +621,38 @@ async def handle_lane2(
             except Exception:
                 resolved_loc_name = f"near {session.last_person}"
 
-    # Emit person location card if we have location data for a mentioned person
-    person_name = mentioned_person or session.last_person
+    # Emit person location card ONLY when:
+    # 1. The user's message explicitly mentions a specific person (not group-wide queries)
+    # 2. The person actually has location data (lat/lng not null in DB)
+    person_name = mentioned_person  # Don't fall back to session.last_person for card
     if person_name and resolved_lat and resolved_lng:
-        # Always reverse geocode for a clean address (don't trust cached/stale values)
-        card_address = resolved_loc_name
-        if not card_address or card_address.replace("-", "").replace(".", "").replace(",", "").replace(" ", "").isdigit():
-            try:
-                card_address = await geocoding.reverse_geocode(resolved_lat, resolved_lng)
-            except Exception:
-                card_address = "Unknown location"
-        yield json.dumps({
-            "type": "person_location",
-            "data": {
-                "name": person_name,
-                "lat": resolved_lat,
-                "lng": resolved_lng,
-                "address": card_address,
-                "updated_ago": prefetched_locations.get(person_name, {}).get("updated_ago", ""),
-                "is_stale": prefetched_locations.get(person_name, {}).get("is_stale", False),
-            }
-        })
+        person_loc_data = prefetched_locations.get(person_name, {})
+        has_real_location = person_loc_data.get("lat") is not None and person_loc_data.get("lng") is not None
+        if has_real_location:
+            # Prefer the pre-fetched address (already reverse-geocoded)
+            card_address = person_loc_data.get("address") or resolved_loc_name
+            # Fallback: if address looks like raw coords, try reverse geocoding
+            import re as _re
+            if not card_address or _re.match(r'^-?\d+\.\d+,?\s*-?\d+\.\d+$', card_address.strip()):
+                try:
+                    addr = await geocoding.reverse_geocode(resolved_lat, resolved_lng)
+                    if addr and not _re.match(r'^-?\d+\.\d+,?\s*-?\d+\.\d+$', addr.strip()):
+                        card_address = addr
+                    else:
+                        card_address = f"near {person_name}'s last shared location"
+                except Exception:
+                    card_address = f"near {person_name}'s last shared location"
+            yield json.dumps({
+                "type": "person_location",
+                "data": {
+                    "name": person_name,
+                    "lat": resolved_lat,
+                    "lng": resolved_lng,
+                    "address": card_address,
+                    "updated_ago": person_loc_data.get("updated_ago", ""),
+                    "is_stale": person_loc_data.get("is_stale", False),
+                }
+            })
 
     yield json.dumps({"type": "stream_end"})
 
@@ -645,6 +668,124 @@ async def handle_lane2(
         lane=2,
         user_message=message,
         assistant_message=answer,
+    )
+
+
+def _is_group_list_query(message: str, cached_members: list[dict] | None = None, last_lane: int | None = None) -> bool:
+    """Detect if the user is asking to see their group members list.
+    Only matches SIMPLE listing requests — NOT complex queries that ask for
+    locations, incidents, safety, comparisons, etc.
+    """
+    msg = message.lower().strip().rstrip("?!.")
+
+    # If the message asks for more than just listing (locations, incidents, safety),
+    # let Lane 2 handle it so the LLM can use tools
+    complex_words = [
+        "where", "safe", "incident", "near", "location", "find",
+        "recent", "crime", "happening", "compare", "most", "which",
+        "top", "tell me", "check", "how", "any",
+    ]
+    if any(w in msg for w in complex_words):
+        return False
+
+    group_list_phrases = [
+        "show me my group members", "show my group members",
+        "show me my group", "show my group", "my group members",
+        "list my group", "list my groups", "who is in my group",
+        "who are my group members", "show me my groups",
+        "my groups", "show groups",
+    ]
+    if any(phrase in msg for phrase in group_list_phrases):
+        return True
+
+    # Check if user references a specific group name with simple show/list intent
+    if cached_members:
+        group_names = set()
+        for m in cached_members:
+            gname = m.get("group_name", "")
+            if gname:
+                group_names.add(gname.lower())
+
+        for gname in group_names:
+            if gname not in msg:
+                continue
+            # Group name + simple show/list word (but not complex queries)
+            show_words = ["show", "list", "only", "display", "open"]
+            if any(w in msg for w in show_words):
+                return True
+            # Follow-up: just the group name after seeing all groups
+            if last_lane == 2:
+                return True
+
+    return False
+
+
+async def _handle_group_list(
+    cached_members: list[dict],
+    session_id: str,
+    message: str,
+) -> AsyncGenerator[str, None]:
+    """Return structured group member data directly — no LLM needed."""
+    # Organize members by group
+    all_groups: dict[str, list[dict]] = {}
+    for m in cached_members:
+        group_name = m.get("group_name", "My Group")
+        if group_name not in all_groups:
+            all_groups[group_name] = []
+        all_groups[group_name].append({
+            "name": m.get("display_name", "Unknown"),
+            "role": m.get("role", "member"),
+            "user_id": m.get("user_id", ""),
+        })
+
+    # Deduplicate members within each group
+    for gname in all_groups:
+        seen = set()
+        unique = []
+        for member in all_groups[gname]:
+            if member["user_id"] not in seen:
+                seen.add(member["user_id"])
+                unique.append(member)
+        all_groups[gname] = unique
+
+    # Check if user is asking for a specific group
+    msg_lower = message.lower().strip().rstrip("?!.")
+    filtered_groups: dict[str, list[dict]] = {}
+    for gname, members in all_groups.items():
+        if gname.lower() in msg_lower:
+            filtered_groups[gname] = members
+
+    # Use filtered if a specific group was matched, otherwise show all
+    groups_to_show = filtered_groups if filtered_groups else all_groups
+
+    group_data = []
+    for gname, members in groups_to_show.items():
+        group_data.append({
+            "name": gname,
+            "members": members,
+        })
+
+    if filtered_groups:
+        summary = f"Here are the members of {', '.join(filtered_groups.keys())}."
+    else:
+        summary = f"You are in {len(group_data)} group{'s' if len(group_data) != 1 else ''}."
+
+    yield json.dumps({"type": "stream_start", "lane": 2})
+    yield json.dumps({
+        "type": "group_members",
+        "data": {
+            "groups": group_data,
+            "summary": summary,
+        }
+    })
+    yield json.dumps({"type": "stream_end"})
+
+    # Update session
+    update_session(
+        session_id,
+        lane=2,
+        user_message=message,
+        assistant_message=f"Showed {len(group_data)} groups with members.",
     )
 
 
@@ -666,14 +807,22 @@ async def handle_chat(
     # Get group members once — reuse for routing and Lane 2 pre-fetch
     cached_members: list[dict] = []
     member_names: list[str] = []
+    group_names: list[str] = []
     if user_id:
         try:
             cached_members = await data_access.get_group_members(user_id)
             member_names = [m.get("display_name", "") for m in cached_members if m.get("display_name")]
+            group_names = list({m.get("group_name", "") for m in cached_members if m.get("group_name")})
         except Exception:
             pass
 
-    lane = classify_lane(message, session, member_names)
+    # Shortcut: "show my group members" / "show me ASU hackathon" → structured data (no LLM)
+    if _is_group_list_query(message, cached_members, session.last_lane) and user_id and cached_members:
+        async for event in _handle_group_list(cached_members, sid, message):
+            yield event
+        return
+
+    lane = classify_lane(message, session, member_names, group_names)
     logger.info(f"[CHAT] routed to Lane {lane} | member_names={member_names}")
 
     if lane == 2:
