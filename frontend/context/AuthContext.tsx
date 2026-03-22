@@ -51,33 +51,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore session on mount + refresh token via InsForge
+  // Restore session on mount from localStorage
   useEffect(() => {
-    async function restoreSession() {
-      // Try to refresh the token via InsForge httpOnly cookie
-      const { data } = await insforge.auth.getCurrentSession().catch(() => ({ data: null }));
-      if (data?.session?.accessToken) {
-        localStorage.setItem("token", data.session.accessToken);
-        await fetchUser(data.session.accessToken);
-        return;
-      }
-      // Fall back to stored token
-      const saved = localStorage.getItem("token");
-      if (saved) {
-        fetchUser(saved);
-      } else {
-        setState((s) => ({ ...s, loading: false }));
-      }
+    const saved = localStorage.getItem("token");
+    if (saved) {
+      fetchUser(saved);
+    } else {
+      setState((s) => ({ ...s, loading: false }));
     }
-    restoreSession();
   }, [fetchUser]);
 
-  // Auto-refresh token every 10 minutes + on tab focus to keep session alive
+  // Keep session alive — re-validate token on tab focus
   useEffect(() => {
     async function refreshToken() {
-      const { data } = await insforge.auth.getCurrentSession().catch(() => ({ data: null }));
-      if (data?.session?.accessToken) {
-        localStorage.setItem("token", data.session.accessToken);
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          await fetchUser(token);
+        } catch {
+          // Token expired
+          localStorage.removeItem("token");
+          setState({ user: null, token: null, loading: false });
+        }
       }
     }
 

@@ -36,17 +36,17 @@ async def generate_brief(
     """Generate an AI safety brief for the area."""
     # 1. Fetch incidents
     delta = radius / 69.0
-    filters = {
-        "lat": f"gte.{lat - delta}",
-        "lng": f"gte.{lng - delta}",
-    }
-    rows = await insforge.query("incidents", filters=filters, limit=2000)
+    raw_params = [
+        ("lat", f"gte.{round(lat - delta, 6)}"),
+        ("lat", f"lte.{round(lat + delta, 6)}"),
+        ("lng", f"gte.{round(lng - delta, 6)}"),
+        ("lng", f"lte.{round(lng + delta, 6)}"),
+    ]
+    rows = await insforge.query("incidents", raw_params=raw_params, limit=2000)
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     incidents = []
     for row in rows:
-        if row["lat"] > lat + delta or row["lng"] > lng + delta:
-            continue
         dist = haversine_distance(lat, lng, row["lat"], row["lng"])
         if dist > radius:
             continue

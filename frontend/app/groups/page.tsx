@@ -14,6 +14,7 @@ import {
   X,
   Loader2,
   UserPlus,
+  MoreVertical,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export default function GroupsPage() {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupType, setNewGroupType] = useState("family");
   const [creating, setCreating] = useState(false);
@@ -291,7 +293,7 @@ export default function GroupsPage() {
             {groups.map((group) => (
               <div
                 key={group.id}
-                className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+                className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5"
               >
                 {editingId === group.id ? (
                   /* Rename mode */
@@ -328,39 +330,86 @@ export default function GroupsPage() {
                 ) : (
                   /* Normal mode */
                   <>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-white">
-                        {group.name}
-                      </h3>
-                      <span className="text-xs text-white/25 capitalize">
-                        {group.type}
-                      </span>
+                    {/* Header */}
+                    <div className="flex items-center gap-3 pb-4 border-b border-white/[0.06] mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#4d7fff]/10 flex items-center justify-center shrink-0">
+                        <Users className="size-5 text-[#7ba4ff]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-white truncate">
+                          {group.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-white/30 capitalize px-1.5 py-0.5 rounded bg-white/[0.04]">
+                            {group.type}
+                          </span>
+                          <span className="text-[10px] text-white/20">
+                            {members[group.id]?.length || 0} members
+                          </span>
+                        </div>
+                      </div>
+                      {/* Three-dot menu */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setMenuOpenId(menuOpenId === group.id ? null : group.id)}
+                          className="p-1.5 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors cursor-pointer"
+                        >
+                          <MoreVertical className="size-4" />
+                        </button>
+                        {menuOpenId === group.id && (
+                          <div className="absolute right-0 top-8 z-10 w-32 rounded-xl border border-white/[0.08] bg-[#16161e] shadow-xl overflow-hidden">
+                            <button
+                              onClick={() => { startRename(group); setMenuOpenId(null); }}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/[0.05] transition-colors cursor-pointer"
+                            >
+                              <Pencil className="size-3" />
+                              Rename
+                            </button>
+                            <button
+                              onClick={() => { deleteGroup(group.id); setMenuOpenId(null); }}
+                              disabled={deletingId === group.id}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400/70 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {deletingId === group.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Members */}
+                    {/* Members with DiceBear avatars */}
                     {members[group.id]?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2 mb-3">
+                      <div className="flex flex-wrap gap-2 mb-4">
                         {members[group.id].map((m) => (
                           <div
                             key={m.id}
-                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06]"
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.05]"
                           >
-                            <div className="w-5 h-5 rounded-full bg-[#4d7fff]/20 flex items-center justify-center text-[10px] font-medium text-[#7ba4ff]">
-                              {m.display_name?.charAt(0)?.toUpperCase() || "?"}
-                            </div>
-                            <span className="text-xs text-white/50">{m.display_name}</span>
+                            <img
+                              src={`https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(m.display_name || "?")}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`}
+                              alt={m.display_name}
+                              className="w-6 h-6 rounded-full"
+                            />
+                            <span className="text-xs text-white/60">{m.display_name}</span>
                             {m.role === "admin" && (
-                              <span className="text-[10px] text-[#7ba4ff]/60">admin</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#4d7fff]/10 text-[#7ba4ff]">admin</span>
                             )}
                           </div>
                         ))}
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 mt-3">
+                    {/* Invite link */}
+                    <div className="flex items-center gap-2 pt-4 border-t border-white/[0.06]">
+                      <div className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.04]">
+                        <p className="text-[10px] text-white/20 truncate">
+                          {typeof window !== "undefined" ? `${window.location.origin}/join/${group.invite_code}` : ""}
+                        </p>
+                      </div>
                       <button
                         onClick={() => copyInvite(group)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-white/40 hover:text-white/60 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-white/40 hover:text-white/60 transition-colors cursor-pointer shrink-0"
                       >
                         {copiedId === group.id ? (
                           <>
@@ -370,30 +419,9 @@ export default function GroupsPage() {
                         ) : (
                           <>
                             <Copy className="size-3" />
-                            Invite link
+                            Copy
                           </>
                         )}
-                      </button>
-
-                      <button
-                        onClick={() => startRename(group)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-white/40 hover:text-white/60 transition-colors cursor-pointer"
-                      >
-                        <Pencil className="size-3" />
-                        Rename
-                      </button>
-
-                      <button
-                        onClick={() => deleteGroup(group.id)}
-                        disabled={deletingId === group.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/10 bg-red-500/5 text-xs text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {deletingId === group.id ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-3" />
-                        )}
-                        Delete
                       </button>
                     </div>
                   </>
