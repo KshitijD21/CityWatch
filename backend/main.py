@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="StreetSense API", version="0.1.0")
+app = FastAPI(title="CityWatch API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,4 +29,4 @@ app.include_router(geocode.router, prefix="/api/geocode", tags=["geocode"])
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "streetsense"}
+    return {"status": "ok", "service": "citywatch"}

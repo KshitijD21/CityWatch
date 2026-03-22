@@ -1,5 +1,5 @@
 {
-  "name": "streetsense",
+  "name": "citywatch",
   "private": true,
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",

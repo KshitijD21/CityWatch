@@ -1,9 +1,9 @@
-STREETSENSE — PROJECT IDEA
+CITYWATCH — PROJECT IDEA
 ===========================
 
 See what's happening around you. For real. With sources.
 
-StreetSense is a real-time safety awareness app. You open it and
+CityWatch is a real-time safety awareness app. You open it and
 instantly see what's been reported around you — theft, disturbances,
 broken streetlights, police activity — all on a live map with
 sources you can verify. No account needed to browse. No fear-mongering.
@@ -56,7 +56,7 @@ stay aware. College students keeping an eye on each other during
 a night out.
 
 Example: You just moved to Phoenix. You don't know which areas
-have had issues. You open StreetSense and see a live map with
+have had issues. You open CityWatch and see a live map with
 pins showing recent incidents — sourced from Phoenix PD data,
 local news, and community reports. You tap a pin and see exactly
 what happened, when, and where the information came from. You type
@@ -426,7 +426,7 @@ Citizen:
 - Enables racial profiling through vague "suspicious person" reports
 - Designed to keep you scared so you keep opening the app
 
-StreetSense:
+CityWatch:
 - No push alerts. You check when you want to check.
 - Unverified reports are clearly marked. Only patterns from
   multiple people or AI-verified data become trusted.
@@ -439,5 +439,5 @@ StreetSense:
 ONE-LINE SUMMARY
 =========================================================
 
-StreetSense shows you what's happening around you with real
+CityWatch shows you what's happening around you with real
 sources — and if you want, around your people too.

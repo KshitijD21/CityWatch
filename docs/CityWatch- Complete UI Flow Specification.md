@@ -1,4 +1,4 @@
-# StreetSense: Complete UI Flow Specification
+# CityWatch: Complete UI Flow Specification
 
 Here's a complete, production-ready UI flow specification. It's structured so you and your backend team can work in parallel with clear contracts.
 
@@ -52,7 +52,7 @@ Landing → Auth → Onboarding → Main Map (Home)
 │                    │  Logo   │              │
 │                    └─────────┘              │
 │                                             │
-│                   StreetSense               │
+│                   CityWatch               │
 │           Know before you go.               │
 │        Coordinate with people you trust.    │
 │                                             │
@@ -153,7 +153,7 @@ Response: { token, user: { id, name, email } }
 │                                             │
 │           ⚠️ Before you start               │
 │                                             │
-│  StreetSense is not a crime predictor.     │
+│  CityWatch is not a crime predictor.     │
 │  We show you what's been reported —        │
 │  you make your own choices.                │
 │                                             │
@@ -329,7 +329,7 @@ Response: { placeId }
 
 ```
 ┌─────────────────────────────────────────────┐
-│  [☰]  StreetSense       [🔔] [💬] [👤]    │
+│  [☰]  CityWatch       [🔔] [💬] [👤]    │
 ├─────────────────────────────────────────────┤
 │  ┌───────────────────────────────────────┐  │
 │  │                                       │  │
@@ -689,7 +689,7 @@ Response: { reportId, status: "pending_verification" }
 
 ```
 ┌─────────────────────────────────────────────┐
-│  ← Back        Ask StreetSense              │
+│  ← Back        Ask CityWatch              │
 ├─────────────────────────────────────────────┤
 │  ┌───────────────────────────────────────┐  │
 │  │ 💬 Hey! Ask me about any area,        │  │
@@ -890,16 +890,16 @@ Response: { answer, sources, suggestedFollowups }
 If you're using React Native + Expo:
 
 ```bash
-npx create-expo-app streetsense --template
-cd streetsense
+npx create-expo-app citywatch --template
+cd citywatch
 npm install react-native-maps @react-navigation/native @react-navigation/stack axios
 ```
 
 If you're using React + Vite (web-first):
 
 ```bash
-npm create vite@latest streetsense -- --template react-ts
-cd streetsense
+npm create vite@latest citywatch -- --template react-ts
+cd citywatch
 npm install react-router-dom leaflet react-leaflet axios
 ```
 

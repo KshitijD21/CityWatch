@@ -1,4 +1,4 @@
-# STREETSENSE — TASK BREAKDOWN
+# CITYWATCH — TASK BREAKDOWN
 
 =========================================================
 FRONTEND
@@ -194,7 +194,7 @@ If user.onboarded is true → go back to map with group features active
 
 Step 1 — Ethical modal
 "Before we start"
-"StreetSense shows you reported safety data. We show what was
+"CityWatch shows you reported safety data. We show what was
 reported, not what will happen. We don't predict. We don't assign
 safety scores. You decide what this information means for you."
 Button: "I understand"

@@ -1,4 +1,4 @@
-STREETSENSE DATABASE SCHEMA (FINAL)
+CITYWATCH DATABASE SCHEMA (FINAL)
 =====================================
 
 

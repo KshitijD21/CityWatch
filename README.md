@@ -1,4 +1,4 @@
-# StreetSense
+# CityWatch
 
 > See what's happening around you. For real. With sources.
 

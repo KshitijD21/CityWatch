@@ -1,6 +1,6 @@
-You are setting up a new project called "StreetSense" from scratch. This is ONLY the project scaffold — folder structure, config files, dependencies, database schema, and environment setup. Do NOT build any features, pages, components, or API logic yet. Just the skeleton so the team can start building immediately.
+You are setting up a new project called "CityWatch" from scratch. This is ONLY the project scaffold — folder structure, config files, dependencies, database schema, and environment setup. Do NOT build any features, pages, components, or API logic yet. Just the skeleton so the team can start building immediately.
 
-Project name: StreetSense (or HeyPoco if you prefer to keep consistency)
+Project name: CityWatch (or HeyPoco if you prefer to keep consistency)
 Package manager: pnpm
 Monorepo: yes, pnpm workspaces
 
@@ -11,7 +11,7 @@ PROJECT STRUCTURE:
 Create this exact folder structure:
 
 ```
-STREETSENSE/
+CITYWATCH/
 ├── frontend/                  # Next.js app
 ├── backend/                   # FastAPI app
 ├── scripts/                   # Seed data, scrapers, utilities
@@ -41,7 +41,7 @@ packages:
 ```
 
 Root package.json:
-- name: "streetsense"
+- name: "citywatch"
 - private: true
 - scripts:
     "dev:frontend": "pnpm --filter frontend dev"
@@ -127,7 +127,7 @@ railway.json:
 ```
 
 README.md:
-- Project name: StreetSense
+- Project name: CityWatch
 - One-liner: "See what's happening around you. For real. With sources."
 - Brief description: Real-time safety awareness app. Live map with sourced incident data, AI-powered chat and area briefs, community reporting with verification.
 - Tech stack section: Next.js, FastAPI, PostgreSQL, Claude AI, TinyFish, Mapbox
@@ -503,7 +503,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="StreetSense API", version="0.1.0")
+app = FastAPI(title="CityWatch API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -528,7 +528,7 @@ app.include_router(geocode.router, prefix="/api/geocode", tags=["geocode"])
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "streetsense"}
+    return {"status": "ok", "service": "citywatch"}
 ```
 
 backend/config.py:
