@@ -9,7 +9,7 @@ from utils.helpers import get_optional_user
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("")
 async def chat(
     req: ChatRequest,
     user: dict | None = Depends(get_optional_user),
