@@ -382,9 +382,14 @@ export default function GroupsPage() {
                     {members[group.id]?.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-4">
                         {members[group.id].map((m) => (
-                          <div
+                          <button
                             key={m.id}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.05]"
+                            onClick={() => {
+                              if (m.user_id) {
+                                router.push(`/map?focus=${m.user_id}`);
+                              }
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.06] hover:border-white/[0.1] transition-colors cursor-pointer"
                           >
                             <img
                               src={`https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(m.display_name || "?")}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`}
@@ -395,7 +400,7 @@ export default function GroupsPage() {
                             {m.role === "admin" && (
                               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#4d7fff]/10 text-[#7ba4ff]">admin</span>
                             )}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
