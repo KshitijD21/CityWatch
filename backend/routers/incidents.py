@@ -65,7 +65,7 @@ async def get_nearby_incidents(
         "lng": f"gte.{lng - delta}",
     }
 
-    # Fetch from DB with bounding box (InsForge default limit is 100)
+    # Fetch from DB with bounding box (default limit is 100, need more)
     rows = await insforge.query(
         "incidents",
         filters=filters,
