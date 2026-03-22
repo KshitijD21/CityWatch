@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type FormEvent } from "react";
+import React, { useState, useRef, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -20,6 +20,101 @@ import {
 import { useAuthContext } from "@/context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function renderBold(text: string) {
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, j) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={j} className="text-white/90 font-semibold">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+const TIP_ICONS = [Shield, Eye, ShieldAlert, AlertTriangle, Car, MapPin, Users, Wrench];
+
+function RichTextCard({ text }: { text: string }) {
+  const lines = text.split("\n").filter((l) => l.trim());
+
+  // Separate numbered items from other text
+  const intro: string[] = [];
+  const tips: { title: string; body: string }[] = [];
+  const outro: string[] = [];
+  let pastTips = false;
+
+  for (const line of lines) {
+    const match = line.match(/^\d+\.\s*\*?\*?(.+)/);
+    if (match) {
+      // Parse "**Title**: body" or "Title: body"
+      const content = match[1];
+      const colonMatch = content.match(/^\*?\*?([^:*]+)\*?\*?[:\s]*(.*)$/);
+      if (colonMatch) {
+        tips.push({ title: colonMatch[1].trim(), body: colonMatch[2].trim() });
+      } else {
+        tips.push({ title: content.replace(/\*\*/g, "").trim(), body: "" });
+      }
+    } else if (tips.length === 0) {
+      intro.push(line.trim());
+    } else {
+      pastTips = true;
+      outro.push(line.trim());
+    }
+  }
+
+  // If no structured tips found, just render as styled paragraphs
+  if (tips.length === 0) {
+    return (
+      <div className="space-y-3">
+        {lines.map((line, i) => (
+          <p key={i} className="text-sm text-white/60 leading-relaxed">
+            {renderBold(line)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Intro */}
+      {intro.map((line, i) => (
+        <p key={`intro-${i}`} className="text-sm text-white/60 leading-relaxed">
+          {renderBold(line)}
+        </p>
+      ))}
+
+      {/* Tips as cards */}
+      <div className="space-y-2 mt-1">
+        {tips.map((tip, i) => {
+          const Icon = TIP_ICONS[i % TIP_ICONS.length];
+          return (
+            <div
+              key={i}
+              className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.04]"
+            >
+              <div className="w-7 h-7 rounded-lg bg-[#4d7fff]/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Icon className="size-3.5 text-[#7ba4ff]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-white/80">{tip.title}</p>
+                {tip.body && (
+                  <p className="text-[11px] text-white/40 mt-0.5 leading-relaxed">{tip.body}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Outro / disclaimer */}
+      {outro.map((line, i) => (
+        <p key={`outro-${i}`} className="text-[11px] text-white/30 leading-relaxed">
+          {renderBold(line)}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 function avatarUrl(name: string): string {
   return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
@@ -453,7 +548,7 @@ export default function ChatPage() {
                 <IncidentCards data={msg.cards} />
               ) : msg.content ? (
                 <>
-                  {msg.content}
+                  {msg.role === "assistant" ? <RichTextCard text={msg.content} /> : msg.content}
                   {msg.personLocation && <PersonLocationCard data={msg.personLocation} />}
                 </>
               ) : (

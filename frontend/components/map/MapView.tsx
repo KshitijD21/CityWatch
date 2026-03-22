@@ -83,6 +83,25 @@ function createMemberMarker(member: MemberPin): HTMLDivElement {
   return wrapper;
 }
 
+function createGeoJSONCircle(center: [number, number], radiusKm: number, points = 64) {
+  const coords: [number, number][] = [];
+  const km = radiusKm;
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dx = km * Math.cos(angle);
+    const dy = km * Math.sin(angle);
+    const lat = center[1] + (dy / 111.32);
+    const lng = center[0] + (dx / (111.32 * Math.cos((center[1] * Math.PI) / 180)));
+    coords.push([lng, lat]);
+  }
+  coords.push(coords[0]); // close the ring
+  return {
+    type: "Feature" as const,
+    geometry: { type: "Polygon" as const, coordinates: [coords] },
+    properties: {},
+  };
+}
+
 export function MapView({ center, incidents, members, onIncidentClick, onMemberClick }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -105,6 +124,41 @@ export function MapView({ center, incidents, members, onIncidentClick, onMemberC
       new maplibregl.NavigationControl({ showCompass: false }),
       "bottom-right"
     );
+
+    // Add 5-mile radius circle around user
+    map.current.on("load", () => {
+      if (!map.current) return;
+      const radiusMiles = 2;
+      const radiusKm = radiusMiles * 1.60934;
+      const circle = createGeoJSONCircle([center.lng, center.lat], radiusKm);
+
+      map.current.addSource("radius-circle", {
+        type: "geojson",
+        data: circle,
+      });
+
+      map.current.addLayer({
+        id: "radius-fill",
+        type: "fill",
+        source: "radius-circle",
+        paint: {
+          "fill-color": "#4d7fff",
+          "fill-opacity": 0.06,
+        },
+      });
+
+      map.current.addLayer({
+        id: "radius-border",
+        type: "line",
+        source: "radius-circle",
+        paint: {
+          "line-color": "#6c9cff",
+          "line-opacity": 0.45,
+          "line-width": 2,
+          "line-dasharray": [3, 2],
+        },
+      });
+    });
 
     return () => {
       map.current?.remove();
@@ -146,13 +200,14 @@ export function MapView({ center, incidents, members, onIncidentClick, onMemberC
       if (isCommunity) {
         // Diamond shape for community reports
         el.style.cssText = `
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
           background: ${color};
-          border: 2px solid rgba(255,255,255,0.3);
+          border: 2px solid rgba(255,255,255,0.5);
+          border-radius: 2px;
           transform: rotate(45deg);
           cursor: pointer;
-          box-shadow: 0 0 8px ${color}60;
+          box-shadow: 0 0 10px ${color}80;
         `;
       } else {
         // Circle for police/news
