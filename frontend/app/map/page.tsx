@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MapView, type MemberPin } from "@/components/map/MapView";
 import { Sidebar } from "@/components/map/Sidebar";
 import { IncidentCard } from "@/components/map/IncidentCard";
+import { MemberProfilePanel } from "@/components/map/MemberProfilePanel";
 import { Legend } from "@/components/map/Legend";
 import { useGroupLocations } from "@/hooks/useGroupLocations";
 import { useAuthContext } from "@/context/AuthContext";
@@ -16,6 +17,7 @@ export default function MapPage() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberPin | null>(null);
   const [sourceFilters, setSourceFilters] = useState<Record<string, boolean>>({
     police: true,
     news: true,
@@ -81,7 +83,7 @@ export default function MapPage() {
   // Show real members, always include "You" pin
   const members: MemberPin[] = userLocation
     ? [
-        { name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
+        { user_id: user?.id, name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
         ...realMembers.filter((m) => !m.isYou),
       ]
     : realMembers;
@@ -114,6 +116,10 @@ export default function MapPage() {
           incidents={filteredIncidents}
           members={members}
           onIncidentClick={setSelectedIncident}
+          onMemberClick={(m) => {
+            setSelectedMember(m);
+            setSelectedIncident(null);
+          }}
         />
 
         <Legend
@@ -125,6 +131,13 @@ export default function MapPage() {
           <IncidentCard
             incident={selectedIncident}
             onClose={() => setSelectedIncident(null)}
+          />
+        )}
+
+        {selectedMember && (
+          <MemberProfilePanel
+            member={selectedMember}
+            onClose={() => setSelectedMember(null)}
           />
         )}
       </div>
