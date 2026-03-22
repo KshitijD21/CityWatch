@@ -5,13 +5,32 @@ import { MapView, type MemberPin } from "@/components/map/MapView";
 import { Sidebar } from "@/components/map/Sidebar";
 import { IncidentCard } from "@/components/map/IncidentCard";
 import { Legend } from "@/components/map/Legend";
+import { useGroupLocations } from "@/hooks/useGroupLocations";
+import { useAuthContext } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import type { Incident } from "@/types";
 
 export default function MapPage() {
+  const { user } = useAuthContext();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [groupId, setGroupId] = useState<string | null>(null);
+
+  // Get user's first group
+  useEffect(() => {
+    apiFetch("/api/groups")
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setGroupId(data[0].id || data[0].group_id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Real-time group locations (falls back gracefully)
+  const { members: realMembers, sharing, startSharing, stopSharing } =
+    useGroupLocations(groupId, user?.id);
 
   // Get user location with fast fallback
   useEffect(() => {
@@ -48,15 +67,18 @@ export default function MapPage() {
       .catch(() => {});
   }, [userLocation]);
 
-  // Group members (demo data — replace with API call later)
-  const members: MemberPin[] = userLocation
-    ? [
-        { name: "Anirudh", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
-        { name: "Ronak", lat: userLocation.lat + 0.008, lng: userLocation.lng - 0.012 },
-        { name: "Kshitij", lat: userLocation.lat - 0.005, lng: userLocation.lng + 0.015 },
-        { name: "Sarah", lat: userLocation.lat + 0.012, lng: userLocation.lng + 0.008 },
-      ]
-    : [];
+  // Use real members if available, otherwise demo data
+  const members: MemberPin[] =
+    realMembers.length > 0
+      ? realMembers
+      : userLocation
+      ? [
+          { name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
+          { name: "Ronak", lat: userLocation.lat + 0.008, lng: userLocation.lng - 0.012 },
+          { name: "Kshitij", lat: userLocation.lat - 0.005, lng: userLocation.lng + 0.015 },
+          { name: "Sarah", lat: userLocation.lat + 0.012, lng: userLocation.lng + 0.008 },
+        ]
+      : [];
 
   if (!userLocation) {
     return (
@@ -68,10 +90,18 @@ export default function MapPage() {
 
   return (
     <div className="h-dvh w-full flex bg-[#08080d]">
-      {/* Sidebar */}
-      <Sidebar incidentCount={incidents.length} />
+      <Sidebar
+        incidentCount={incidents.length}
+        sharing={sharing}
+        onToggleSharing={() => {
+          if (sharing && groupId) {
+            stopSharing(groupId);
+          } else if (groupId) {
+            startSharing(groupId, user?.name || "You");
+          }
+        }}
+      />
 
-      {/* Map area */}
       <div className="flex-1 relative">
         <MapView
           center={userLocation}

@@ -11,6 +11,7 @@ import {
   Bell,
   User,
   ShieldCheck,
+  Radio,
 } from "lucide-react";
 
 const navItems = [
@@ -23,9 +24,11 @@ const navItems = [
 
 interface SidebarProps {
   incidentCount: number;
+  sharing?: boolean;
+  onToggleSharing?: () => void;
 }
 
-export function Sidebar({ incidentCount }: SidebarProps) {
+export function Sidebar({ incidentCount, sharing, onToggleSharing }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -63,6 +66,25 @@ export function Sidebar({ incidentCount }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Location sharing toggle */}
+      {onToggleSharing && (
+        <div className="px-2 py-3 border-t border-white/[0.06]">
+          <button
+            onClick={onToggleSharing}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm w-full cursor-pointer transition-colors ${
+              sharing
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "text-white/40 hover:text-white/70 hover:bg-white/[0.03]"
+            }`}
+          >
+            <Radio className={`size-[18px] shrink-0 ${sharing ? "animate-pulse" : ""}`} />
+            <span className="hidden sm:block">
+              {sharing ? "Sharing Live" : "Share Location"}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Bottom actions */}
       <div className="px-2 py-3 border-t border-white/[0.06] space-y-1">
