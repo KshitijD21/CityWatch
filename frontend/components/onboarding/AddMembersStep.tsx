@@ -1,17 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Copy, Check, Loader2 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-
-const AGE_BANDS = ["Adult", "Teen", "Child"];
-
-interface Member {
-  name: string;
-  ageBand: string;
-}
+import { UserPlus, Copy, Check, Share2 } from "lucide-react";
 
 interface AddMembersStepProps {
   groupId: string | null;
@@ -21,35 +12,33 @@ interface AddMembersStepProps {
 }
 
 export function AddMembersStep({ groupId, groupName, inviteCode, onContinue }: AddMembersStepProps) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [newName, setNewName] = useState("");
-  const [newAgeBand, setNewAgeBand] = useState("Adult");
-  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  function addMember() {
-    if (!newName.trim()) return;
-
-    // Add locally immediately
-    setMembers((prev) => [...prev, { name: newName.trim(), ageBand: newAgeBand }]);
-    const savedName = newName.trim();
-    const savedAgeBand = newAgeBand.toLowerCase();
-    setNewName("");
-
-    // Fire-and-forget API call
-    if (groupId) {
-      apiFetch(`/api/groups/${groupId}/members`, {
-        method: "POST",
-        body: JSON.stringify({ display_name: savedName, age_band: savedAgeBand }),
-      }).catch(() => {});
-    }
-  }
+  const inviteLink = typeof window !== "undefined"
+    ? `${window.location.origin}/join/${inviteCode || groupId}`
+    : "";
 
   function copyInviteLink() {
-    const link = `${window.location.origin}/join/${inviteCode || groupId}`;
-    navigator.clipboard.writeText(link);
+    navigator.clipboard.writeText(inviteLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function shareInviteLink() {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join "${groupName}" on CityWatch`,
+          text: `Join my safety group "${groupName}" on CityWatch`,
+          url: inviteLink,
+        });
+      } catch {
+        // User cancelled or share failed — fall back to copy
+        copyInviteLink();
+      }
+    } else {
+      copyInviteLink();
+    }
   }
 
   return (
@@ -59,78 +48,51 @@ export function AddMembersStep({ groupId, groupName, inviteCode, onContinue }: A
           <UserPlus className="size-5 text-[#7ba4ff]" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-white">Add people to &ldquo;{groupName}&rdquo;</h2>
-          <p className="text-xs text-white/40">You can always add more later</p>
+          <h2 className="text-lg font-semibold text-white">Invite people to &ldquo;{groupName}&rdquo;</h2>
+          <p className="text-xs text-white/40">Share this link so others can join your group</p>
         </div>
       </div>
 
-      {/* Members list */}
-      {members.length > 0 && (
-        <div className="mt-4 space-y-2 mb-5">
-          {members.map((m, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]"
-            >
-              <span className="text-sm text-white/80">{m.name}</span>
-              <span className="text-xs text-white/30">{m.ageBand}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Add member form */}
-      <div className="space-y-3 mt-5">
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <Input
-              type="text"
-              placeholder="Name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20 focus-visible:ring-[#4d7fff]/50"
-            />
-          </div>
-          <select
-            value={newAgeBand}
-            onChange={(e) => setNewAgeBand(e.target.value)}
-            className="h-9 px-3 rounded-lg bg-white/[0.03] border border-white/[0.08] text-sm text-white/70 outline-none"
-          >
-            {AGE_BANDS.map((r) => (
-              <option key={r} value={r} className="bg-[#08080d]">
-                {r}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <Button
-          onClick={addMember}
-          disabled={loading || !newName.trim()}
-          variant="outline"
-          className="w-full h-9 bg-white/[0.03] border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.06] rounded-xl text-sm cursor-pointer disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="size-4 animate-spin" /> : "Add Member"}
-        </Button>
+      {/* Invite code display */}
+      <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.03] p-5 text-center">
+        <p className="text-xs text-white/30 mb-2">Invite code</p>
+        <p className="text-2xl font-mono font-bold tracking-[0.3em] text-[#7ba4ff]">
+          {inviteCode || "------"}
+        </p>
       </div>
 
       {/* Invite link */}
-      <button
-        onClick={copyInviteLink}
-        className="w-full mt-4 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-white/[0.06] bg-white/[0.02] text-sm text-white/40 hover:text-white/60 transition-colors cursor-pointer"
-      >
-        {copied ? (
-          <>
-            <Check className="size-3.5 text-emerald-400" />
-            <span className="text-emerald-400">Copied!</span>
-          </>
-        ) : (
-          <>
-            <Copy className="size-3.5" />
-            Share invite link
-          </>
-        )}
-      </button>
+      <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
+        <p className="text-xs text-white/30 mb-1.5">Invite link</p>
+        <p className="text-sm text-white/60 break-all">{inviteLink}</p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={copyInviteLink}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] text-sm text-white/50 hover:text-white/70 transition-colors cursor-pointer"
+        >
+          {copied ? (
+            <>
+              <Check className="size-4 text-emerald-400" />
+              <span className="text-emerald-400">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="size-4" />
+              Copy link
+            </>
+          )}
+        </button>
+        <button
+          onClick={shareInviteLink}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[#4d7fff]/30 bg-[#4d7fff]/10 text-sm text-[#7ba4ff] hover:bg-[#4d7fff]/20 transition-colors cursor-pointer"
+        >
+          <Share2 className="size-4" />
+          Share
+        </button>
+      </div>
 
       {/* Continue */}
       <Button

@@ -35,6 +35,11 @@ export default function GroupsPage() {
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupType, setNewGroupType] = useState("family");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   useEffect(() => {
     apiFetch("/api/groups")
@@ -109,6 +114,32 @@ export default function GroupsPage() {
     }
   }
 
+  async function createGroup() {
+    if (!newGroupName.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await apiFetch("/api/groups", {
+        method: "POST",
+        body: JSON.stringify({ name: newGroupName.trim(), type: newGroupType }),
+      });
+      // Refresh groups list
+      const data = await apiFetch("/api/groups");
+      setGroups(Array.isArray(data) ? data : []);
+      setShowCreate(false);
+      setNewGroupName("");
+      // Copy invite link automatically
+      const link = `${window.location.origin}/join/${res.invite_code}`;
+      navigator.clipboard.writeText(link);
+      setCopiedId(res.group_id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create group");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   async function deleteGroup(groupId: string) {
     setDeletingId(groupId);
     try {
@@ -140,21 +171,20 @@ export default function GroupsPage() {
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            onClick={() => setShowJoin(!showJoin)}
+            onClick={() => { setShowJoin(!showJoin); setShowCreate(false); }}
             className="text-sm text-white/50 hover:text-white/80 hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
           >
             <UserPlus className="size-4 mr-1" />
             Join
           </Button>
-          <Link href="/onboarding">
-            <Button
-              variant="ghost"
-              className="text-sm text-[#7ba4ff] hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
-            >
-              <Plus className="size-4 mr-1" />
-              New
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            onClick={() => { setShowCreate(!showCreate); setShowJoin(false); }}
+            className="text-sm text-[#7ba4ff] hover:bg-white/5 rounded-lg px-3 h-8 cursor-pointer"
+          >
+            <Plus className="size-4 mr-1" />
+            New
+          </Button>
         </div>
       </div>
 
@@ -192,6 +222,52 @@ export default function GroupsPage() {
           </div>
         )}
 
+        {/* Create group panel */}
+        {showCreate && (
+          <div className="mb-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-sm font-medium text-white/70 mb-3">Create a new group</p>
+            <div className="space-y-3">
+              <Input
+                type="text"
+                placeholder="Group name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createGroup();
+                  if (e.key === "Escape") setShowCreate(false);
+                }}
+                autoFocus
+                className="bg-white/[0.03] border-white/[0.08] text-white text-sm focus-visible:ring-[#4d7fff]/50"
+              />
+              <div className="flex gap-2">
+                {["family", "friends"].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setNewGroupType(t)}
+                    className={`flex-1 px-3 py-2 rounded-xl text-sm border transition-all cursor-pointer ${
+                      newGroupType === t
+                        ? "border-[#4d7fff]/50 bg-[#4d7fff]/10 text-[#7ba4ff]"
+                        : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <Button
+                onClick={createGroup}
+                disabled={creating || !newGroupName.trim()}
+                className="w-full h-9 bg-[#4d7fff] text-white hover:bg-[#5a88ff] rounded-xl text-sm cursor-pointer disabled:opacity-50"
+              >
+                {creating ? <Loader2 className="size-4 animate-spin" /> : "Create Group"}
+              </Button>
+              {createError && (
+                <p className="text-xs text-red-400">{createError}</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-5 h-5 border-2 border-[#4d7fff] border-t-transparent rounded-full animate-spin" />
@@ -203,11 +279,12 @@ export default function GroupsPage() {
             <p className="text-white/25 text-xs mb-6">
               Create a group to start coordinating with your people.
             </p>
-            <Link href="/onboarding">
-              <Button className="h-9 px-5 bg-[#4d7fff] text-white hover:bg-[#5a88ff] rounded-xl text-sm cursor-pointer transition-colors">
-                Create a Group
-              </Button>
-            </Link>
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="h-9 px-5 bg-[#4d7fff] text-white hover:bg-[#5a88ff] rounded-xl text-sm cursor-pointer transition-colors"
+            >
+              Create a Group
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">
