@@ -54,7 +54,6 @@ export interface Incident {
   created_at: string;
   distance_miles?: number;
   photo_url?: string;
-  image_url?: string;
 }
 
 export interface IncidentSource {

@@ -40,36 +40,15 @@ You have these tools available:
 
 PROCESS:
 1. Think about what data you need
-2. If the data is already in PRE-FETCHED DATA, use it directly — do NOT call tools for data you already have
-3. Call tools only for data that is NOT pre-fetched (e.g., incidents near a specific location)
-4. Once you have enough data, provide a final answer as PLAIN TEXT only
-
-IMPORTANT: When asked about ALL group members (e.g., "are my members safe", "where is everyone"), report the status of EACH member using the PRE-FETCHED LIVE LOCATIONS data. List each person's name, their location, and when it was last updated.
-
-MULTIPLE GROUPS: If the user is in multiple groups, the PRE-FETCHED data shows members organized by group name. When the user says "show me my group members" or "my group", first tell them which groups they are in and list members per group. If they ask about a specific group, only show that group's members.
+2. Call the appropriate tool(s)
+3. Once you have enough data, provide a final answer as PLAIN TEXT only
 
 RESPONSE RULES:
 - NEVER return JSON in your final answer. Always respond with plain text narrative.
-- NEVER show raw latitude/longitude coordinates (like 33.4139, -111.9073) to the user.
-- For person locations: ALWAYS use the "address" field from PRE-FETCHED LIVE LOCATIONS data (e.g., "near E University Dr, Tempe"). The address is already reverse-geocoded for you. Do NOT say "their last known area" or "his last known area" if an address is available in the pre-fetched data.
+- NEVER show raw latitude/longitude coordinates (like 33.4139, -111.9073) to the user. ALWAYS use the "address" field from get_live_location or "location_name" from incidents. If address is missing, say "their last known area" instead of coordinates.
 - NEVER show raw UTC timestamps. Use the "occurred_ago" field which contains Phoenix MST date+time+relative (e.g., "March 21, 08:15 AM MST (~3 hours ago)"). When listing incidents, list them in the order returned by the tool (newest first).
 - When reporting someone's location, say something like "Ronak is near E University Dr, Tempe" NOT "Ronak's location was last updated at 33.4139, -111.9073".
 - If a location has "is_stale": true, explicitly mention it may be outdated.
-
-FORMATTING RULES FOR MULTI-PERSON QUERIES:
-When the user asks about multiple people (e.g., "find where each member is and show incidents near them"):
-- Use a clear header for EACH person (e.g., "**Ronak**" or "### Ronak")
-- Under each person, first show their location using the "address" field from PRE-FETCHED LIVE LOCATIONS (e.g., "Near E University Dr, Tempe"), then list their nearby incidents as a numbered list
-- If the user asks for "top N incidents", show EXACTLY N incidents per person — no more, no less
-- Do NOT repeat the same incident under the same person. Each incident should appear only once per person.
-- Do NOT dump all incidents in one flat list at the end — keep them grouped under each person
-- If a person has no nearby incidents, say "No recent incidents nearby."
-- If multiple people are in the same area and have the same nearby incidents, still list them separately under each person (but only the requested count)
-
-GENERAL FORMATTING:
-- NEVER repeat the same incident twice in a response. Each unique incident should appear only once.
-- When comparing people, use ### headers for each person and list incidents under each. If incidents overlap, just list them once under each person — do NOT say "the same incident" or rephrase duplicates.
-- When the user asks about their own profile/groups, list each group BY NAME and their role (admin/member). Never say "your group" — say the group name.
 
 SAFETY COMMUNICATION RULES:
 - NEVER say an area is "safe" or "unsafe." Describe what was reported.
@@ -197,47 +176,13 @@ def build_react_prompt(
     prefetch_parts = []
     if last_person:
         prefetch_parts.append(f"CONVERSATION CONTEXT: The user was previously asking about \"{last_person}\". If they say \"he\", \"she\", \"they\", or \"them\", they likely mean {last_person}.")
-    user_uid = ""
     if user_profile:
-        user_name = user_profile.get("display_name") or user_profile.get("email", "Unknown")
-        user_uid = user_profile.get("id", "")
-        prefetch_parts.append(f"CURRENT USER: name={user_name}, id={user_uid}")
+        name = user_profile.get("display_name") or user_profile.get("email", "Unknown")
+        prefetch_parts.append(f"CURRENT USER: name={name}, id={user_profile.get('id', '')}")
     if prefetched_members:
-        # Organize members by group
-        groups: dict[str, list[str]] = {}
-        user_roles: dict[str, str] = {}  # group_name → user's role
-        for m in prefetched_members:
-            name = m.get("display_name", "Unknown")
-            uid = m.get("user_id", "")
-            role = m.get("role", "member")
-            group_name = m.get("group_name", "Unknown Group")
-            if group_name not in groups:
-                groups[group_name] = []
-            groups[group_name].append(f"  - {name} (user_id={uid}, role={role})")
-            # Track the current user's role in each group
-            if uid == user_uid:
-                user_roles[group_name] = role
-        # Show user's own group summary first
-        if user_roles:
-            role_lines = [f"  - {gname} (role: {role})" for gname, role in user_roles.items()]
-            prefetch_parts.append("YOUR GROUPS (the current user's memberships):\n" + "\n".join(role_lines))
-        member_lines = []
-        for gname, members_list in groups.items():
-            member_lines.append(f"  Group: {gname}")
-            member_lines.extend(members_list)
-        prefetch_parts.append("PRE-FETCHED GROUP MEMBERS (organized by group):\n" + "\n".join(member_lines))
+        prefetch_parts.append(f"PRE-FETCHED GROUP MEMBERS: {prefetched_members}")
     if prefetched_locations:
-        loc_summaries = []
-        for name, loc in prefetched_locations.items():
-            addr = loc.get("address", "unknown location")
-            lat = loc.get("lat")
-            lng = loc.get("lng")
-            updated_ago = loc.get("updated_ago", "unknown")
-            is_stale = loc.get("is_stale", False)
-            stale_note = " (STALE — may be outdated)" if is_stale else ""
-            coords_note = f", coords=({lat}, {lng})" if lat and lng else ""
-            loc_summaries.append(f"  - {name}: near {addr}{coords_note}, last updated {updated_ago}{stale_note}")
-        prefetch_parts.append("PRE-FETCHED LIVE LOCATIONS (use these directly, no tool call needed — use the coords for get_nearby_incidents):\n" + "\n".join(loc_summaries))
+        prefetch_parts.append(f"PRE-FETCHED LIVE LOCATIONS: {prefetched_locations}")
     if saved_places:
         prefetch_parts.append(f"USER'S SAVED PLACES: {saved_places}")
 

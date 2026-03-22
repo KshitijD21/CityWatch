@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, type FormEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -20,204 +20,6 @@ import {
 import { useAuthContext } from "@/context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-function renderBold(text: string) {
-  const parts = text.split(/(\*\*.*?\*\*)/g);
-  return parts.map((part, j) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={j} className="text-white/90 font-semibold">{part.slice(2, -2)}</strong>;
-    }
-    return part;
-  });
-}
-
-const TIP_ICONS = [Shield, Eye, ShieldAlert, AlertTriangle, Car, MapPin, Users, Wrench];
-
-interface Section {
-  heading?: string;
-  lines: string[];
-}
-
-function RichTextCard({ text }: { text: string }) {
-  const rawLines = text.split("\n");
-
-  // Parse into sections split by markdown headers (### or **)
-  const sections: Section[] = [];
-  let current: Section = { lines: [] };
-
-  for (const line of rawLines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    // Detect headers: "### Name", "**Name**", "## Name"
-    const h3Match = trimmed.match(/^#{2,3}\s+(.+)/);
-    const boldOnlyMatch = trimmed.match(/^\*\*([^*]+)\*\*$/);
-
-    if (h3Match || boldOnlyMatch) {
-      if (current.heading || current.lines.length > 0) {
-        sections.push(current);
-      }
-      current = {
-        heading: (h3Match?.[1] || boldOnlyMatch?.[1] || "").trim(),
-        lines: [],
-      };
-    } else {
-      current.lines.push(trimmed);
-    }
-  }
-  if (current.heading || current.lines.length > 0) {
-    sections.push(current);
-  }
-
-  // Check if we have a multi-section layout (person headers)
-  const hasHeaders = sections.some((s) => s.heading);
-
-  if (!hasHeaders) {
-    // Simple mode: numbered items → cards, otherwise paragraphs
-    const tips: { title: string; body: string }[] = [];
-    const intro: string[] = [];
-    const outro: string[] = [];
-
-    for (const line of sections.flatMap((s) => s.lines)) {
-      const match = line.match(/^\d+\.\s*\*?\*?(.+)/);
-      if (match) {
-        const content = match[1];
-        const colonMatch = content.match(/^\*?\*?([^:*]+)\*?\*?[:\s]*(.*)$/);
-        if (colonMatch) {
-          tips.push({ title: colonMatch[1].trim(), body: colonMatch[2].trim() });
-        } else {
-          tips.push({ title: content.replace(/\*\*/g, "").trim(), body: "" });
-        }
-      } else if (tips.length === 0) {
-        intro.push(line);
-      } else {
-        outro.push(line);
-      }
-    }
-
-    if (tips.length === 0) {
-      return (
-        <div className="space-y-2">
-          {sections.flatMap((s) => s.lines).map((line, i) => (
-            <p key={i} className="text-sm text-white/60 leading-relaxed">
-              {renderBold(line)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-3">
-        {intro.map((line, i) => (
-          <p key={`i-${i}`} className="text-sm text-white/60 leading-relaxed">
-            {renderBold(line)}
-          </p>
-        ))}
-        <div className="space-y-2 mt-1">
-          {tips.map((tip, i) => {
-            const Icon = TIP_ICONS[i % TIP_ICONS.length];
-            return (
-              <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.04]">
-                <div className="w-7 h-7 rounded-lg bg-[#4d7fff]/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Icon className="size-3.5 text-[#7ba4ff]" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-white/80">{tip.title}</p>
-                  {tip.body && <p className="text-[11px] text-white/40 mt-0.5 leading-relaxed">{tip.body}</p>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {outro.map((line, i) => (
-          <p key={`o-${i}`} className="text-[11px] text-white/30 leading-relaxed">{renderBold(line)}</p>
-        ))}
-      </div>
-    );
-  }
-
-  // Multi-section mode: render person/section headers with their content
-  return (
-    <div className="space-y-3">
-      {sections.map((section, si) => {
-        if (!section.heading) {
-          // Intro or outro text (no header)
-          return section.lines.map((line, li) => {
-            // Disclaimer-style lines at the end
-            const isDisclaimer = line.toLowerCase().includes("based on reported data");
-            return (
-              <p key={`t-${si}-${li}`} className={`text-sm leading-relaxed ${isDisclaimer ? "text-white/30 text-[11px]" : "text-white/60"}`}>
-                {renderBold(line)}
-              </p>
-            );
-          });
-        }
-
-        // Section with a heading (person card)
-        // Separate location line, bullet/numbered items, and other text
-        const locationLines: string[] = [];
-        const items: { text: string }[] = [];
-        const otherLines: string[] = [];
-
-        for (const line of section.lines) {
-          if (line.match(/^[-•]\s+/) || line.match(/^\d+\.\s+/)) {
-            items.push({ text: line.replace(/^[-•]\s+/, "").replace(/^\d+\.\s+/, "") });
-          } else if (
-            line.toLowerCase().includes("location:") ||
-            line.toLowerCase().includes("is near") ||
-            line.toLowerCase().includes("last updated")
-          ) {
-            locationLines.push(line);
-          } else {
-            otherLines.push(line);
-          }
-        }
-
-        return (
-          <div key={`s-${si}`} className="rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden">
-            {/* Person header */}
-            <div className="px-4 py-2.5 border-b border-white/[0.05] flex items-center gap-2.5">
-              <img
-                src={avatarUrl(section.heading)}
-                alt={section.heading}
-                className="w-7 h-7 rounded-full border border-white/10"
-              />
-              <span className="text-sm font-semibold text-white/90">{section.heading}</span>
-            </div>
-            <div className="px-4 py-3 space-y-2">
-              {/* Location info */}
-              {locationLines.map((line, li) => (
-                <div key={`loc-${li}`} className="flex items-center gap-1.5">
-                  <MapPin className="size-3 text-emerald-400 shrink-0" />
-                  <span className="text-xs text-white/50">{renderBold(line.replace(/^-?\s*location:\s*/i, ""))}</span>
-                </div>
-              ))}
-              {/* Incident items */}
-              {items.length > 0 && (
-                <div className="space-y-1.5 mt-1">
-                  {items.map((item, ii) => {
-                    const Icon = TIP_ICONS[ii % TIP_ICONS.length];
-                    return (
-                      <div key={`item-${ii}`} className="flex items-start gap-2.5 px-2 py-1.5 rounded-lg bg-white/[0.02]">
-                        <Icon className="size-3 text-[#7ba4ff] shrink-0 mt-0.5" />
-                        <span className="text-xs text-white/50 leading-relaxed">{renderBold(item.text)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {/* Other text */}
-              {otherLines.map((line, oi) => (
-                <p key={`ot-${oi}`} className="text-xs text-white/40 leading-relaxed">{renderBold(line)}</p>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function avatarUrl(name: string): string {
   return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
@@ -249,28 +51,11 @@ interface PersonLocation {
   is_stale?: boolean;
 }
 
-interface GroupMember {
-  name: string;
-  role: string;
-  user_id: string;
-}
-
-interface GroupData {
-  name: string;
-  members: GroupMember[];
-}
-
-interface GroupMembersData {
-  groups: GroupData[];
-  summary: string;
-}
-
 interface Message {
   role: "user" | "assistant";
   content: string;
   cards?: CardData;
   personLocation?: PersonLocation;
-  groupMembers?: GroupMembersData;
 }
 
 const CATEGORY_CONFIG: Record<string, { icon: typeof Shield; color: string; bg: string }> = {
@@ -291,13 +76,8 @@ function getCategoryConfig(category: string) {
 function timeAgo(dateStr: string): string {
   try {
     const diff = Date.now() - new Date(dateStr).getTime();
-    // Handle future timestamps (timezone mismatch) — show absolute time
-    if (diff < 0) {
-      const d = new Date(dateStr);
-      return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
+    if (diff < 0) return "just now";
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
@@ -391,10 +171,6 @@ function IncidentCards({ data }: { data: CardData }) {
 }
 
 function PersonLocationCard({ data }: { data: PersonLocation }) {
-  // Hide raw coordinates — only show if we have a real address
-  const isRawCoords = /^-?\d+\.\d+,?\s*-?\d+\.\d+$/.test(data.address?.trim() || "");
-  const displayAddress = isRawCoords ? "Location available on map" : data.address;
-
   return (
     <div className="mt-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
       <div className="flex items-center gap-3">
@@ -414,7 +190,7 @@ function PersonLocationCard({ data }: { data: PersonLocation }) {
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <MapPin className="size-3 text-emerald-400" />
-            <span className="text-xs text-white/50">{displayAddress}</span>
+            <span className="text-xs text-white/50">{data.address}</span>
           </div>
           {data.updated_ago && (
             <div className="flex items-center gap-1.5 mt-0.5">
@@ -428,77 +204,27 @@ function PersonLocationCard({ data }: { data: PersonLocation }) {
   );
 }
 
-function GroupMembersCards({ data }: { data: GroupMembersData }) {
-  return (
-    <div className="space-y-3 mt-1">
-      <p className="text-sm text-white/60">{data.summary}</p>
-      {data.groups.map((group) => (
-        <div
-          key={group.name}
-          className="rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden"
-        >
-          {/* Group header */}
-          <div className="px-4 py-2.5 border-b border-white/[0.05] flex items-center gap-2">
-            <Users className="size-3.5 text-[#7ba4ff]" />
-            <span className="text-xs font-semibold text-white/80">{group.name}</span>
-            <span className="text-[10px] text-white/30 ml-auto">
-              {group.members.length} member{group.members.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          {/* Members */}
-          <div className="px-3 py-2 space-y-1">
-            {group.members.map((member) => (
-              <div
-                key={member.user_id}
-                className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors"
-              >
-                <img
-                  src={avatarUrl(member.name)}
-                  alt={member.name}
-                  className="w-7 h-7 rounded-full border border-white/10"
-                />
-                <span className="text-xs text-white/70 flex-1">{member.name}</span>
-                {member.role === "admin" && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#4d7fff]/15 text-[#7ba4ff] font-medium">
-                    Admin
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function ChatPage() {
   const { user } = useAuthContext();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
-
-  // Restore from sessionStorage on mount (client only)
-  useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === "undefined") return [];
     try {
       const saved = sessionStorage.getItem("chat_messages");
-      if (saved) setMessages(JSON.parse(saved));
-      const sid = sessionStorage.getItem("chat_session_id");
-      if (sid) setSessionId(sid);
-    } catch {}
-  }, []);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return sessionStorage.getItem("chat_session_id");
+  });
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Persist messages and session to sessionStorage
   useEffect(() => {
-    if (initialized.current) {
-      sessionStorage.setItem("chat_messages", JSON.stringify(messages));
-    }
+    sessionStorage.setItem("chat_messages", JSON.stringify(messages));
   }, [messages]);
   useEffect(() => {
     if (sessionId) sessionStorage.setItem("chat_session_id", sessionId);
@@ -603,18 +329,6 @@ export default function ChatPage() {
                 return updated;
               });
               setLoading(false);
-            } else if (event.type === "group_members") {
-              assistantContent = event.data.summary || "";
-              setMessages((m) => {
-                const updated = [...m];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: assistantContent,
-                  groupMembers: event.data,
-                };
-                return updated;
-              });
-              setLoading(false);
             } else if (event.type === "person_location") {
               setMessages((m) => {
                 const updated = [...m];
@@ -679,8 +393,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-dvh bg-[#08080d] text-white flex justify-center">
-      <div className="w-full max-w-3xl flex flex-col border-x border-white/[0.04]">
+    <div className="h-dvh bg-[#08080d] text-white flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] shrink-0">
         <Link href="/map" className="p-2 rounded-lg text-white/40 hover:text-white/70 transition-colors">
@@ -693,8 +406,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-2xl mx-auto space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.length === 0 && (
           <div className="text-center py-12">
             <Shield className="size-10 text-[#4d7fff]/30 mx-auto mb-4" />
@@ -732,26 +444,20 @@ export default function ChatPage() {
               className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "max-w-[75%] bg-[#4d7fff] text-white whitespace-pre-wrap"
-                  : msg.cards || msg.personLocation || msg.groupMembers
+                  : msg.cards || msg.personLocation
                   ? "max-w-[90%] bg-white/[0.05] text-white/70 border border-white/[0.06] whitespace-pre-wrap"
                   : "max-w-[75%] bg-white/[0.05] text-white/70 border border-white/[0.06] whitespace-pre-wrap"
               }`}
             >
-              {msg.groupMembers ? (
-                <GroupMembersCards data={msg.groupMembers} />
-              ) : msg.cards ? (
+              {msg.cards ? (
                 <IncidentCards data={msg.cards} />
               ) : msg.content ? (
                 <>
-                  {msg.role === "assistant" ? <RichTextCard text={msg.content} /> : msg.content}
+                  {msg.content}
                   {msg.personLocation && <PersonLocationCard data={msg.personLocation} />}
                 </>
               ) : (
-                <span className="flex items-center gap-1 py-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce [animation-delay:150ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce [animation-delay:300ms]" />
-                </span>
+                <Loader2 className="size-4 text-white/30 animate-spin" />
               )}
             </div>
             {msg.role === "user" && (
@@ -764,7 +470,6 @@ export default function ChatPage() {
           </div>
         ))}
 
-        </div>
       </div>
 
       {/* Input */}
@@ -772,7 +477,7 @@ export default function ChatPage() {
         onSubmit={handleSubmit}
         className="shrink-0 px-4 py-3 border-t border-white/[0.06]"
       >
-        <div className="max-w-2xl mx-auto flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -789,7 +494,6 @@ export default function ChatPage() {
           </button>
         </div>
       </form>
-      </div>
     </div>
   );
 }

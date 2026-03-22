@@ -18,7 +18,7 @@ def _message_explicitly_requests_user_location(message: str) -> bool:
     msg = message.lower()
     return any(phrase in msg for phrase in [
         "near me", "around me", "my area", "my location",
-        "where i am", "where am i", "my neighborhood", "close to me",
+        "where i am", "my neighborhood", "close to me",
     ])
 
 
@@ -38,21 +38,11 @@ async def _extract_location(
     Priority for explicit location requests:
       geocode message → GPS (if "near me") → session → DB → saved → default
     """
-    # If user is asking about their own location ("Where am I?"), skip geocoding
-    # and fall through to GPS / live location
-    msg_lower = message.lower().strip().rstrip("?!.")
-    self_location_phrases = [
-        "where am i", "where i am", "my location", "am i safe",
-        "what's near me", "whats near me",
-    ]
-    is_self_query = any(phrase in msg_lower for phrase in self_location_phrases)
-
     # Try geocoding the message text — first try the raw message,
     # then extract location phrases if the raw message fails
-    if not is_self_query:
-        geo = await geocoding.geocode_location(message)
-        if geo:
-            return geo["lat"], geo["lng"], geo["place_name"]
+    geo = await geocoding.geocode_location(message)
+    if geo:
+        return geo["lat"], geo["lng"], geo["place_name"]
 
     # Try extracting location from common patterns
     import re
@@ -121,25 +111,27 @@ async def _extract_location(
 
 
 def _should_show_cards(message: str, member_names: list[str] | None = None) -> bool:
-    """Show cards only for incident/location queries. Text mode for general questions."""
+    """Detect if the user wants to see incident cards vs a narrative answer.
+    Only triggers for explicit list/show requests. If a person's name is in
+    the message, default to text mode (e.g. "what happened to Anirudh?").
+    """
     msg = message.lower()
-    # If a person's name is mentioned, use text mode
+    # If a person's name is mentioned, default to text mode
     if member_names:
         for name in member_names:
-            name_lower = name.lower()
-            if name_lower in msg:
+            if name.lower() in msg:
                 return False
-            first = name_lower.split()[0] if name_lower else ""
-            if first and len(first) >= 3 and first in msg:
-                return False
-    # Card triggers — queries specifically about incidents, safety conditions, or locations
     card_phrases = [
-        "incident", "crime", "report", "what happened", "happened near",
-        "happened today", "happened recently", "show me", "list",
-        "is it safe", "safe to walk", "safe near", "how safe",
-        "near campus", "near downtown", "near me", "near here",
-        "nearby", "around here", "in my area", "in this area",
-        "what's happening", "whats happening", "any crime",
+        "show me incidents", "show incidents", "list incidents",
+        "list crimes", "list reports", "show me crimes",
+        "recent incidents", "any incidents", "crimes near",
+        "reports near", "show me what happened",
+        "what happened", "what's happening", "whats happening",
+        "any crime", "any reports", "is it safe",
+        "safe to walk", "safe near", "safety near",
+        "how safe", "incidents near", "incidents around",
+        "happened near", "happened around", "happened today",
+        "happened recently", "crime near", "crime around",
     ]
     return any(phrase in msg for phrase in card_phrases)
 
@@ -161,8 +153,8 @@ def _extract_days_from_message(message: str) -> int | None:
     import re
     msg = message.lower()
 
-    # "last N hours/hr/h" or "past N hours/hr/h"
-    match = re.search(r'(?:last|past)\s+(\d+)\s*(?:hours?|hrs?|h)\b', msg)
+    # "last N hours/hr/h"
+    match = re.search(r'last\s+(\d+)\s*(?:hours?|hrs?|h)\b', msg)
     if match:
         n = int(match.group(1))
         # Return fractional days — but since DB queries use integer days,
@@ -281,16 +273,16 @@ def _extract_days_from_message(message: str) -> int | None:
 
 
 async def _enrich_incidents_with_location(incidents: list[dict]) -> list[dict]:
-    """Add location_name to each incident. Uses description street names
-    instead of reverse geocoding to avoid Nominatim rate limits."""
+    """Add location_name to each incident via reverse geocoding."""
+    if not incidents:
+        return incidents
+    coords = [(inc["lat"], inc["lng"]) for inc in incidents if "lat" in inc and "lng" in inc]
+    if not coords:
+        return incidents
+    geo_map = await reverse_geocode_batch(coords)
     for inc in incidents:
-        # Extract location from description (e.g., "FIGHT at 12XX N 40TH ST — ...")
-        desc = inc.get("description", "")
-        if " at " in desc:
-            loc = desc.split(" at ", 1)[1].split(" — ")[0].split(" --")[0].strip()
-            inc["location_name"] = loc
-        else:
-            inc["location_name"] = f"{inc.get('lat', 0):.4f}, {inc.get('lng', 0):.4f}"
+        key = f"{inc['lat']:.4f},{inc['lng']:.4f}"
+        inc["location_name"] = geo_map.get(key, f"{inc['lat']:.4f}, {inc['lng']:.4f}")
     return incidents
 
 
@@ -322,22 +314,6 @@ async def handle_lane1(
         days = session_state.last_days
     else:
         days = 7
-    # Reverse geocode to get a precise address when location_name is
-    # generic ("your current location") or raw coords ("33.4308, -111.9359")
-    import re as _re
-    needs_geocode = (
-        location_name in ("your current location", "your live location", "previous location")
-        or (location_name and _re.match(r'^-?\d+\.\d+,\s*-?\d+\.\d+$', location_name))
-        or not location_name
-    )
-    if needs_geocode and lat and lng:
-        try:
-            precise_name = await geocoding.reverse_geocode(lat, lng)
-            if precise_name and not _re.match(r'^-?\d+\.\d+,\s*-?\d+\.\d+$', precise_name):
-                location_name = precise_name
-        except Exception:
-            pass
-
     logger.info(f"[LANE1] lat={lat} lng={lng} loc={location_name} radius={radius}mi days={days} (requested_radius={requested_radius} requested_days={requested_days})")
 
     # Fetch data
@@ -391,7 +367,7 @@ async def handle_lane1(
             "content": (
                 f"The user asked: \"{message}\"\n"
                 f"There are {len(incidents)} incidents near {location_name or 'this location'} "
-                f"in the last {days} day{'s' if days != 1 else ''}. Write a ONE-SENTENCE summary for a card header. "
+                f"in the last 30 days. Write a ONE-SENTENCE summary for a card header. "
                 f"Do NOT return JSON. Just the summary sentence."
             ),
         }
@@ -482,8 +458,7 @@ async def handle_lane2(
         except Exception:
             pass
 
-        # Pre-fetch live locations for all members and enrich with address + relative time
-        from datetime import datetime as _dt, timezone as _tz
+        # Pre-fetch live locations for all members
         for member in prefetched_members:
             member_uid = member.get("user_id")
             if member_uid:
@@ -491,39 +466,6 @@ async def handle_lane2(
                     loc = await data_access.get_live_location(member_uid)
                     if loc:
                         name = member.get("display_name", member_uid)
-                        # Reverse geocode for human-readable address
-                        if loc.get("lat") and loc.get("lng"):
-                            try:
-                                addr = await geocoding.reverse_geocode(loc["lat"], loc["lng"])
-                                # Check if reverse geocode returned raw coords
-                                import re as _re
-                                if addr and not _re.match(r'^-?\d+\.\d+,?\s*-?\d+\.\d+$', addr.strip()):
-                                    loc["address"] = addr
-                                else:
-                                    loc["address"] = f"near {name}'s last shared location"
-                            except Exception:
-                                loc["address"] = f"near {name}'s last shared location"
-                        # Compute relative time + staleness
-                        updated = loc.get("updated_at", "")
-                        if updated:
-                            try:
-                                dt = _dt.fromisoformat(updated.replace("Z", "+00:00"))
-                                delta = _dt.now(_tz.utc) - dt
-                                minutes = int(delta.total_seconds() / 60)
-                                loc["is_stale"] = minutes > 5
-                                if minutes < 1:
-                                    loc["updated_ago"] = "just now"
-                                elif minutes < 60:
-                                    loc["updated_ago"] = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-                                elif minutes < 1440:
-                                    hours = minutes // 60
-                                    loc["updated_ago"] = f"{hours} hour{'s' if hours != 1 else ''} ago"
-                                else:
-                                    days_ago = minutes // 1440
-                                    loc["updated_ago"] = f"{days_ago} day{'s' if days_ago != 1 else ''} ago"
-                            except Exception:
-                                loc["updated_ago"] = "unknown"
-                                loc["is_stale"] = True
                         prefetched_locations[name] = loc
                 except Exception:
                     pass
@@ -562,26 +504,11 @@ async def handle_lane2(
 
     # Extract person name mentioned for follow-up context
     mentioned_person = None
-    # Multi-person queries (e.g. "each of them", "all members") → no single person card
-    multi_person_phrases = [
-        "each of them", "all member", "every member", "everyone",
-        "each member", "each person", "all of them", "where is everyone",
-    ]
-    msg_lower = message.lower()
-    is_multi_person = any(phrase in msg_lower for phrase in multi_person_phrases)
-
-    if prefetched_members and not is_multi_person:
+    if prefetched_members:
+        msg_lower = message.lower()
         for member in prefetched_members:
             name = member.get("display_name", "")
-            if not name:
-                continue
-            name_lower = name.lower()
-            if name_lower in msg_lower:
-                mentioned_person = name
-                break
-            # Also match first name (e.g. "Anirudh" matches "Anirudh Palaskar")
-            first = name_lower.split()[0] if name_lower else ""
-            if first and len(first) >= 3 and first in msg_lower:
+            if name and name.lower() in msg_lower:
                 mentioned_person = name
                 break
 
@@ -621,38 +548,27 @@ async def handle_lane2(
             except Exception:
                 resolved_loc_name = f"near {session.last_person}"
 
-    # Emit person location card ONLY when:
-    # 1. The user's message explicitly mentions a specific person (not group-wide queries)
-    # 2. The person actually has location data (lat/lng not null in DB)
-    person_name = mentioned_person  # Don't fall back to session.last_person for card
+    # Emit person location card if we have location data for a mentioned person
+    person_name = mentioned_person or session.last_person
     if person_name and resolved_lat and resolved_lng:
-        person_loc_data = prefetched_locations.get(person_name, {})
-        has_real_location = person_loc_data.get("lat") is not None and person_loc_data.get("lng") is not None
-        if has_real_location:
-            # Prefer the pre-fetched address (already reverse-geocoded)
-            card_address = person_loc_data.get("address") or resolved_loc_name
-            # Fallback: if address looks like raw coords, try reverse geocoding
-            import re as _re
-            if not card_address or _re.match(r'^-?\d+\.\d+,?\s*-?\d+\.\d+$', card_address.strip()):
-                try:
-                    addr = await geocoding.reverse_geocode(resolved_lat, resolved_lng)
-                    if addr and not _re.match(r'^-?\d+\.\d+,?\s*-?\d+\.\d+$', addr.strip()):
-                        card_address = addr
-                    else:
-                        card_address = f"near {person_name}'s last shared location"
-                except Exception:
-                    card_address = f"near {person_name}'s last shared location"
-            yield json.dumps({
-                "type": "person_location",
-                "data": {
-                    "name": person_name,
-                    "lat": resolved_lat,
-                    "lng": resolved_lng,
-                    "address": card_address,
-                    "updated_ago": person_loc_data.get("updated_ago", ""),
-                    "is_stale": person_loc_data.get("is_stale", False),
-                }
-            })
+        # Always reverse geocode for a clean address (don't trust cached/stale values)
+        card_address = resolved_loc_name
+        if not card_address or card_address.replace("-", "").replace(".", "").replace(",", "").replace(" ", "").isdigit():
+            try:
+                card_address = await geocoding.reverse_geocode(resolved_lat, resolved_lng)
+            except Exception:
+                card_address = "Unknown location"
+        yield json.dumps({
+            "type": "person_location",
+            "data": {
+                "name": person_name,
+                "lat": resolved_lat,
+                "lng": resolved_lng,
+                "address": card_address,
+                "updated_ago": prefetched_locations.get(person_name, {}).get("updated_ago", ""),
+                "is_stale": prefetched_locations.get(person_name, {}).get("is_stale", False),
+            }
+        })
 
     yield json.dumps({"type": "stream_end"})
 
@@ -668,125 +584,6 @@ async def handle_lane2(
         lane=2,
         user_message=message,
         assistant_message=answer,
-    )
-
-
-def _is_group_list_query(message: str, cached_members: list[dict] | None = None, last_lane: int | None = None) -> bool:
-    """Detect if the user is asking to see their group members list.
-    Only matches SIMPLE listing requests — NOT complex queries that ask for
-    locations, incidents, safety, comparisons, etc.
-    """
-    msg = message.lower().strip().rstrip("?!.")
-
-    # If the message asks for more than just listing (locations, incidents, safety),
-    # let Lane 2 handle it so the LLM can use tools
-    complex_words = [
-        "where", "safe", "incident", "near", "location", "find",
-        "recent", "crime", "happening", "compare", "most", "which",
-        "top", "tell me", "check", "how", "any",
-    ]
-    import re as _re
-    if any(_re.search(r'\b' + _re.escape(w) + r'\b', msg) for w in complex_words):
-        return False
-
-    group_list_phrases = [
-        "show me my group members", "show my group members",
-        "show me my group", "show my group", "my group members",
-        "list my group", "list my groups", "who is in my group",
-        "who are my group members", "show me my groups",
-        "my groups", "show groups",
-    ]
-    if any(phrase in msg for phrase in group_list_phrases):
-        return True
-
-    # Check if user references a specific group name with simple show/list intent
-    if cached_members:
-        group_names = set()
-        for m in cached_members:
-            gname = m.get("group_name", "")
-            if gname:
-                group_names.add(gname.lower())
-
-        for gname in group_names:
-            if gname not in msg:
-                continue
-            # Group name + simple show/list word (but not complex queries)
-            show_words = ["show", "list", "only", "display", "open"]
-            if any(w in msg for w in show_words):
-                return True
-            # Follow-up: just the group name after seeing all groups
-            if last_lane == 2:
-                return True
-
-    return False
-
-
-async def _handle_group_list(
-    cached_members: list[dict],
-    session_id: str,
-    message: str,
-) -> AsyncGenerator[str, None]:
-    """Return structured group member data directly — no LLM needed."""
-    # Organize members by group
-    all_groups: dict[str, list[dict]] = {}
-    for m in cached_members:
-        group_name = m.get("group_name", "My Group")
-        if group_name not in all_groups:
-            all_groups[group_name] = []
-        all_groups[group_name].append({
-            "name": m.get("display_name", "Unknown"),
-            "role": m.get("role", "member"),
-            "user_id": m.get("user_id", ""),
-        })
-
-    # Deduplicate members within each group
-    for gname in all_groups:
-        seen = set()
-        unique = []
-        for member in all_groups[gname]:
-            if member["user_id"] not in seen:
-                seen.add(member["user_id"])
-                unique.append(member)
-        all_groups[gname] = unique
-
-    # Check if user is asking for a specific group
-    msg_lower = message.lower().strip().rstrip("?!.")
-    filtered_groups: dict[str, list[dict]] = {}
-    for gname, members in all_groups.items():
-        if gname.lower() in msg_lower:
-            filtered_groups[gname] = members
-
-    # Use filtered if a specific group was matched, otherwise show all
-    groups_to_show = filtered_groups if filtered_groups else all_groups
-
-    group_data = []
-    for gname, members in groups_to_show.items():
-        group_data.append({
-            "name": gname,
-            "members": members,
-        })
-
-    if filtered_groups:
-        summary = f"Here are the members of {', '.join(filtered_groups.keys())}."
-    else:
-        summary = f"You are in {len(group_data)} group{'s' if len(group_data) != 1 else ''}."
-
-    yield json.dumps({"type": "stream_start", "lane": 2})
-    yield json.dumps({
-        "type": "group_members",
-        "data": {
-            "groups": group_data,
-            "summary": summary,
-        }
-    })
-    yield json.dumps({"type": "stream_end"})
-
-    # Update session
-    update_session(
-        session_id,
-        lane=2,
-        user_message=message,
-        assistant_message=f"Showed {len(group_data)} groups with members.",
     )
 
 
@@ -808,24 +605,14 @@ async def handle_chat(
     # Get group members once — reuse for routing and Lane 2 pre-fetch
     cached_members: list[dict] = []
     member_names: list[str] = []
-    group_names: list[str] = []
     if user_id:
         try:
             cached_members = await data_access.get_group_members(user_id)
             member_names = [m.get("display_name", "") for m in cached_members if m.get("display_name")]
-            group_names = list({m.get("group_name", "") for m in cached_members if m.get("group_name")})
         except Exception:
             pass
 
-    # Shortcut: "show my group members" / "show me ASU hackathon" → structured data (no LLM)
-    is_group_query = _is_group_list_query(message, cached_members, session.last_lane)
-    logger.info(f"[CHAT] group_list_query={is_group_query} user_id={bool(user_id)} cached_members={len(cached_members)}")
-    if is_group_query and user_id and cached_members:
-        async for event in _handle_group_list(cached_members, sid, message):
-            yield event
-        return
-
-    lane = classify_lane(message, session, member_names, group_names)
+    lane = classify_lane(message, session, member_names)
     logger.info(f"[CHAT] routed to Lane {lane} | member_names={member_names}")
 
     if lane == 2:
