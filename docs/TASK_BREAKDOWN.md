@@ -150,11 +150,13 @@ Title: "What did you observe?"
 Subtitle: "Reports are about conditions, not people"
 
 Category selection (pick one):
-Streetlight out / broken
-Unusual police activity
-I felt unsafe here
-Heard disturbance
+Theft
+Assault
+Vandalism
+Harassment
 Vehicle break-in
+Disturbance
+Infrastructure (streetlight out, etc.)
 Other safety concern
 
 Description textarea (optional)
@@ -200,8 +202,9 @@ If user.onboarded is true → go back to map with group features active
 **Backend ready (B5):** Auth endpoints are complete.
 - Signup: `POST /api/auth/signup` → `{ email, password, name, age_band }` → returns `{ user_id, token, onboarded }`
 - Login: `POST /api/auth/login` → `{ email, password }` or `{ google_token }` → returns `{ user_id, token, onboarded }`
-- Profile: `GET /api/auth/me` (with Bearer token) → returns full user profile
-- Update: `PUT /api/auth/me` → `{ name, age_band, notification_prefs }`
+  - Google OAuth first login auto-creates user row (name from email prefix, age_band defaults to "adult")
+- Profile: `GET /api/auth/me` (with Bearer token) → returns full user profile with `groups` and `saved_places` arrays
+- Update: `PUT /api/auth/me` → `{ name, age_band, notification_prefs }` (all optional, at least one required)
 - Onboarded: `PUT /api/auth/me/onboarded` → sets `onboarded = true`
 - Store token from login/signup response, pass as `Authorization: Bearer <token>` on all authenticated requests
 
@@ -424,44 +427,47 @@ disclaimer: "Based on reported data — conditions change."
 ## B4. (Kshitij) COMMUNITY REPORT ENDPOINTS (Auth Required)
 
 POST /api/reports
-Body: { category, description, lat, lng, reported_at }
+Body: { category, description, lat, lng }
+(reported_at defaults to now() server-side in DB, not sent by client)
 Headers: Authorization (required)
 
 Logic:
-Step 1: Validate input.
-Category must be in allowed list.
-Description must not be empty if provided.
-Lat/lng must be valid coordinates.
+Step 1: Insert into community_reports table.
+Category must be in allowed list:
+theft, assault, vandalism, harassment, vehicle_breakin,
+disturbance, infrastructure, other.
+(Updated via migration 002 — matches incidents table categories.)
+Status = "unverified"
 
-    Step 2: Save to community_reports table.
-      Status = "unverified"
-      linked_incident_id = null
-
-    Step 3: Also create a record in incidents table.
-      Source = "community"
-      Verified = false
+    Step 2: Create a linked record in incidents table.
+      Source = "community", verified = false
+      occurred_at = current UTC timestamp (server-side)
       This makes the pin show on the map immediately.
-      Save the incident_id back to community_reports.linked_incident_id.
 
-    Step 4: Broadcast via realtime.                    ← WEBHOOK/REALTIME
+    Step 3: Link incident back to report.
+      Update community_reports.linked_incident_id with the new incident id.
+
+    Step 4: Broadcast via realtime.                    ← TODO (WEBHOOK/REALTIME)
       Push a "new_event" message to the realtime channel
       for this geographic area so other users' maps update
       immediately without refreshing.
 
-    Step 5: Trigger AI verification as background task.
-      Don't block the response — return success to user immediately.
-      Run verification asynchronously (see B6).
+    Step 5: Trigger AI verification as background task. ✅
+      Uses FastAPI BackgroundTasks to call verify_report(report_id).
+      Response returns immediately while verification runs async (see B6).
 
 Returns: { report_id, incident_id, status: "unverified" }
 
 GET /api/reports/nearby
-Query params: lat, lng, radius, days
+Query params: lat, lng, radius (default 0.5 miles), days (default 7)
+Uses `get_nearby_reports` RPC function (migration 003) for spatial+time query.
 Returns community reports near a location with their status.
 
 PUT /api/reports/:id/flag
 Headers: Authorization (required)
 Logic: increment flagged_by_users count on the report.
 If flagged_by_users >= 3, auto-change status to "flagged."
+Returns: { flagged_by_users, status }
 
 ## B5. (Ronak) AUTH AND USER ENDPOINTS (Auth Required) ✅ COMPLETE
 
@@ -469,8 +475,8 @@ If flagged_by_users >= 3, auto-change status to "flagged."
 
 POST /api/auth/signup
 Body: { email, password, name, age_band }
-Logic: create user via InsForge auth SDK.
-Returns: { user_id, token }
+Logic: create auth user via InsForge, then insert profile row in users table.
+Returns: { user_id, token, onboarded }
 
 POST /api/auth/login
 Body: { email, password } or { google_token }
@@ -494,44 +500,44 @@ Sets onboarded = true after completing onboarding.
 - `user_id` is in the token payload as `sub`
 - Supports both email/password and Google OAuth login
 
-## B6. AI VERIFICATION (Background Task — Not An Endpoint)
+## B6. AI VERIFICATION (Background Task — Not An Endpoint) ✅ STEPS 1-8 COMPLETE
+
+**Status: Steps 1-8 implemented. Steps 9-10 (clustering + realtime) are TODO.**
 
 This is NOT called by the frontend. It runs automatically
-after a community report is submitted (triggered by B4).
+after a community report is submitted (triggered by B4 via FastAPI BackgroundTasks).
 
-Step 1: Get the new report details.
+Implementation: `backend/services/verification_service.py` → `verify_report(report_id)`
 
-Step 2: Fetch official incidents within 0.5 miles, last 7 days.
+Step 1: Get the new report details from `community_reports` table. ✅
 
-Step 3: Fetch other community reports within 0.25 miles, last 7 days.
+Step 2: Fetch official incidents within 0.5 miles, last 7 days (source != community). ✅
 
-Step 4: Send to Claude with verification prompt:
-"Here is a user-submitted report. Here are official police
-reports from the same area. Here are other community reports.
-Assess: 1. Is this plausible for this area and time? 2. Does it match or correlate with official data? 3. Are there corroborating community reports? 4. Does the description target specific people or contain
-racial/ethnic descriptions?
-Respond with JSON:
-{ status: verified/unverified/flagged, reason: '...' }"
+Step 3: Fetch other community reports within 0.25 miles, last 7 days
+via `get_nearby_reports` RPC (excludes the report being verified). ✅
 
-Step 5: Parse Claude's response.
+Step 4: Send to Claude (claude-sonnet-4-20250514) with verification prompt. ✅
+Prompt instructs Claude to assess plausibility, correlation with
+official data, corroboration, and flag targeting of individuals.
+Response format: `{ status, confidence, reason }`
 
-Step 6: Update community_reports table:
+Step 5: Parse Claude's JSON response. Falls back to "unverified" on parse error. ✅
+
+Step 6: Update community_reports table: ✅
 Set status to Claude's verdict.
 Set verification_note to Claude's reason.
 
-Step 7: If status = "verified":
+Step 7: If status = "verified": ✅
 Update the linked incident in incidents table:
-Set verified = true
-Set verification_note
+Set verified = true, verification_note = reason.
 
-Step 8: If status = "flagged":
+Step 8: If status = "flagged": ✅
 Update the linked incident:
-Set verified = false
-Optionally hide the pin from the map or mark it specially.
+Set verified = false, verification_note = reason.
 
-Step 9: Run clustering check (see B7).
+Step 9: Run clustering check (see B7). ← TODO
 
-Step 10: Broadcast update via realtime. ← WEBHOOK/REALTIME
+Step 10: Broadcast update via realtime. ← TODO (WEBHOOK/REALTIME)
 Push "event_updated" to the area channel so the pin
 on other users' maps changes from yellow to verified
 or disappears if flagged.

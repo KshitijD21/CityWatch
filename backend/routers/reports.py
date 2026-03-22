@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from models.schemas import ReportCreate
 from services.insforge_service import insforge
+from services.verification_service import verify_report
 from utils.helpers import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -13,6 +18,7 @@ router = APIRouter()
 @router.post("/")
 async def submit_report(
     req: ReportCreate,
+    background_tasks: BackgroundTasks,
     token_payload: dict = Depends(get_current_user),
 ):
     """Submit a community report. Creates a linked incident so pin shows on map immediately."""
@@ -46,7 +52,9 @@ async def submit_report(
         filters={"id": f"eq.{report['id']}"},
     )
 
-    # TODO: Trigger B6 AI verification as background task
+    # B6: Trigger AI verification as background task
+    background_tasks.add_task(verify_report, report["id"])
+    logger.info("B6 verification queued for report=%s", report["id"])
 
     return {
         "report_id": report["id"],

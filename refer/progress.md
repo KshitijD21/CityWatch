@@ -1,5 +1,21 @@
 # Progress Log
 
+## 2026-03-22 — B6: AI Verification Service (Steps 1-8)
+
+### Files Changed
+- `backend/services/verification_service.py` — full rewrite: `verify_report(report_id)` fetches report, nearby official incidents (0.5mi/7d), nearby community reports (0.25mi/7d via RPC), calls Claude (claude-sonnet-4-20250514) with verification prompt, parses JSON verdict, updates `community_reports.status` + `verification_note`, updates linked `incidents.verified` + `verification_note`; helper functions: `_fetch_nearby_official_incidents()`, `_fetch_nearby_community_reports()`, `_format_incidents()`, `_format_reports()`
+- `backend/routers/reports.py` — wired B6 into B4: imports `verify_report`, added `BackgroundTasks` param to `submit_report()`, triggers `verify_report(report_id)` as background task after report creation
+- `docs/TASK_BREAKDOWN.md` — marked B6 steps 1-8 as complete, updated B4 step 5 from TODO to done
+
+## 2026-03-22 — Add Migrations 002-003 + Fix migrate.py $$ splitting
+
+### Files Added
+- `scripts/migrations/002_update_community_reports_and_add_rpc.sql` — DO block: drops old `community_reports_category_check` constraint, adds updated categories (`theft`, `assault`, `vandalism`, `harassment`, `vehicle_breakin`, `disturbance`, `infrastructure`, `other`)
+- `scripts/migrations/003_add_nearby_reports_rpc.sql` — creates `get_nearby_reports(p_lat, p_lng, p_radius_miles, p_days)` RPC function
+
+### Files Changed
+- `scripts/migrate.py` — added `split_sql()` function that respects `$$` dollar-quoted blocks when splitting SQL statements; replaced naive `;` split in `apply_migration()`
+
 ## 2026-03-22 — Remove DEFAULT_USER_ID Auth Bypass
 
 ### Files Changed

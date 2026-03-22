@@ -56,19 +56,59 @@ def get_pending(applied: set[str]) -> list[str]:
     return [f for f in files if os.path.basename(f) not in applied]
 
 
+def split_sql(sql: str) -> list[str]:
+    """Split SQL into statements, respecting dollar-quoted blocks ($$..$$)."""
+    import re
+    statements = []
+    current = []
+    in_dollar_quote = False
+    dollar_tag = None
+
+    for line in sql.split("\n"):
+        stripped = line.strip()
+        # Skip pure comment lines outside statements
+        if not current and (not stripped or stripped.startswith("--")):
+            continue
+
+        # Track $$ dollar quoting
+        dollar_matches = re.findall(r'\$[a-zA-Z_]*\$', line)
+        for tag in dollar_matches:
+            if not in_dollar_quote:
+                in_dollar_quote = True
+                dollar_tag = tag
+            elif tag == dollar_tag:
+                in_dollar_quote = False
+                dollar_tag = None
+
+        current.append(line)
+
+        # Statement ends at semicolon (only outside $$ blocks)
+        if not in_dollar_quote and stripped.endswith(";"):
+            stmt = "\n".join(current).strip()
+            if stmt and not all(l.strip().startswith("--") or not l.strip() for l in current):
+                statements.append(stmt)
+            current = []
+
+    # Handle trailing statement without semicolon
+    if current:
+        stmt = "\n".join(current).strip()
+        if stmt and not all(l.strip().startswith("--") or not l.strip() for l in current):
+            if not stmt.endswith(";"):
+                stmt += ";"
+            statements.append(stmt)
+
+    return statements
+
+
 def apply_migration(client: httpx.Client, filepath: str):
     filename = os.path.basename(filepath)
     with open(filepath) as f:
         sql = f.read()
 
-    # Split on semicolons and run each statement
-    statements = [s.strip() for s in sql.split(";") if s.strip() and not s.strip().startswith("--")]
+    # Split on semicolons, respecting $$ dollar-quoted blocks
+    statements = split_sql(sql)
     for stmt in statements:
-        # Skip comment-only blocks
-        lines = [l for l in stmt.split("\n") if l.strip() and not l.strip().startswith("--")]
-        if not lines:
-            continue
-        run_sql(client, stmt + ";")
+        run_sql(client, stmt)
 
     # Record as applied
     run_sql(client, f"INSERT INTO _migrations (filename) VALUES ('{filename}');")
