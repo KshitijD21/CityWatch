@@ -1,23 +1,28 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { MapView, type MemberPin } from "@/components/map/MapView";
-import { Sidebar } from "@/components/map/Sidebar";
-import { IncidentCard } from "@/components/map/IncidentCard";
-import { ReportModal } from "@/components/map/ReportModal";
-import { AlertTriangle } from "lucide-react";
-import { MemberProfilePanel } from "@/components/map/MemberProfilePanel";
-import { Legend } from "@/components/map/Legend";
-import { useGroupLocations } from "@/hooks/useGroupLocations";
-import { useAuthContext } from "@/context/AuthContext";
-import { apiFetch } from "@/lib/api";
-import type { Incident } from "@/types";
+import { useState, useEffect } from 'react';
+import { MapView, type MemberPin } from '@/components/map/MapView';
+import { Sidebar } from '@/components/map/Sidebar';
+import { IncidentCard } from '@/components/map/IncidentCard';
+import { ReportModal } from '@/components/map/ReportModal';
+import { AlertTriangle } from 'lucide-react';
+import { MemberProfilePanel } from '@/components/map/MemberProfilePanel';
+import { Legend } from '@/components/map/Legend';
+import { useGroupLocations } from '@/hooks/useGroupLocations';
+import { useAuthContext } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/api';
+import type { Incident } from '@/types';
 
 export default function MapPage() {
   const { user } = useAuthContext();
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(
+    null
+  );
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberPin | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -29,7 +34,7 @@ export default function MapPage() {
 
   // Get user's first group
   useEffect(() => {
-    apiFetch("/api/groups")
+    apiFetch('/api/groups')
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setGroupId(data[0].id || data[0].group_id);
@@ -39,8 +44,12 @@ export default function MapPage() {
   }, []);
 
   // Real-time group locations (falls back gracefully)
-  const { members: realMembers, sharing, startSharing, stopSharing } =
-    useGroupLocations(groupId, user?.id);
+  const {
+    members: realMembers,
+    sharing,
+    startSharing,
+    stopSharing,
+  } = useGroupLocations(groupId, user?.id);
 
   // Get user location with fast fallback
   useEffect(() => {
@@ -71,13 +80,15 @@ export default function MapPage() {
     if (!userLocation) return;
 
     apiFetch(
-      `/api/incidents/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=2`
+      `/api/incidents/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=10`
     )
       .then((data) => setIncidents(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [userLocation]);
 
-  const filteredIncidents = incidents.filter((inc) => sourceFilters[inc.source] !== false);
+  const filteredIncidents = incidents.filter(
+    (inc) => sourceFilters[inc.source] !== false
+  );
 
   function toggleSource(source: string) {
     setSourceFilters((prev) => ({ ...prev, [source]: !prev[source] }));
@@ -86,7 +97,13 @@ export default function MapPage() {
   // Show real members, always include "You" pin
   const members: MemberPin[] = userLocation
     ? [
-        { user_id: user?.id, name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
+        {
+          user_id: user?.id,
+          name: user?.name || 'You',
+          lat: userLocation.lat,
+          lng: userLocation.lng,
+          isYou: true,
+        },
         ...realMembers.filter((m) => !m.isYou),
       ]
     : realMembers;
@@ -108,7 +125,7 @@ export default function MapPage() {
           if (sharing && groupId) {
             stopSharing(groupId);
           } else if (groupId) {
-            startSharing(groupId, user?.name || "You");
+            startSharing(groupId, user?.name || 'You');
           }
         }}
       />
@@ -125,10 +142,7 @@ export default function MapPage() {
           }}
         />
 
-        <Legend
-          sourceFilters={sourceFilters}
-          onToggleSource={toggleSource}
-        />
+        <Legend sourceFilters={sourceFilters} onToggleSource={toggleSource} />
 
         {selectedIncident && (
           <IncidentCard
