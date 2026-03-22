@@ -685,7 +685,8 @@ def _is_group_list_query(message: str, cached_members: list[dict] | None = None,
         "recent", "crime", "happening", "compare", "most", "which",
         "top", "tell me", "check", "how", "any",
     ]
-    if any(w in msg for w in complex_words):
+    import re as _re
+    if any(_re.search(r'\b' + _re.escape(w) + r'\b', msg) for w in complex_words):
         return False
 
     group_list_phrases = [
@@ -817,7 +818,9 @@ async def handle_chat(
             pass
 
     # Shortcut: "show my group members" / "show me ASU hackathon" → structured data (no LLM)
-    if _is_group_list_query(message, cached_members, session.last_lane) and user_id and cached_members:
+    is_group_query = _is_group_list_query(message, cached_members, session.last_lane)
+    logger.info(f"[CHAT] group_list_query={is_group_query} user_id={bool(user_id)} cached_members={len(cached_members)}")
+    if is_group_query and user_id and cached_members:
         async for event in _handle_group_list(cached_members, sid, message):
             yield event
         return
