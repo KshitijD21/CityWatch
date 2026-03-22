@@ -215,6 +215,19 @@ async def add_member(
     return member
 
 
+@router.post("/{group_id}/leave")
+async def leave_group(group_id: str, token_payload: dict = Depends(get_current_user)):
+    """Leave a group (remove self from members)."""
+    user_id = token_payload["sub"]
+
+    await insforge.delete(
+        "group_members",
+        filters={"group_id": f"eq.{group_id}", "user_id": f"eq.{user_id}"},
+    )
+
+    return {"left": True}
+
+
 @router.delete("/{group_id}/members/{member_id}")
 async def remove_member(
     group_id: str,

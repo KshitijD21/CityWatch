@@ -23,9 +23,12 @@ interface LegendProps {
   onToggleSource?: (source: string) => void;
   categoryFilters?: Record<string, boolean>;
   onToggleCategory?: (category: string) => void;
+  groups?: { id: string; name: string }[];
+  activeGroupId?: string | null;
+  onSelectGroup?: (id: string) => void;
 }
 
-export function Legend({ sourceFilters, onToggleSource, categoryFilters, onToggleCategory }: LegendProps) {
+export function Legend({ sourceFilters, onToggleSource, categoryFilters, onToggleCategory, groups, activeGroupId, onSelectGroup }: LegendProps) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -97,6 +100,28 @@ export function Legend({ sourceFilters, onToggleSource, categoryFilters, onToggl
                 <span className="text-[11px] text-white/40">Community report</span>
               </div>
             </div>
+
+            {/* Group selector */}
+            {groups && groups.length > 1 && onSelectGroup && (
+              <div className="mt-2.5 pt-2.5 border-t border-white/[0.06]">
+                <span className="text-[10px] text-white/25 font-medium uppercase tracking-wider">Groups</span>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {groups.map((g) => (
+                    <button
+                      key={g.id}
+                      onClick={() => onSelectGroup(g.id)}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all cursor-pointer ${
+                        activeGroupId === g.id
+                          ? "bg-[#4d7fff]/20 text-[#7ba4ff] border-[#4d7fff]/30"
+                          : "bg-white/[0.03] text-white/30 border-white/[0.06] hover:text-white/50"
+                      }`}
+                    >
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
