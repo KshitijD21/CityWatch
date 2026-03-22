@@ -116,7 +116,9 @@ async def get_user_profile(user_id: str) -> dict | None:
 
 
 async def get_group_members(user_id: str) -> list[dict]:
-    """Get all group members for groups the user belongs to."""
+    """Get all group members for groups the user belongs to.
+    Each member dict includes 'group_name' and 'group_id'.
+    """
     # First find user's groups
     memberships = await insforge.query(
         "group_members",
@@ -124,6 +126,18 @@ async def get_group_members(user_id: str) -> list[dict]:
     )
     if not isinstance(memberships, list):
         memberships = [memberships] if memberships else []
+
+    # Fetch group names
+    group_names: dict[str, str] = {}
+    for membership in memberships:
+        gid = membership.get("group_id")
+        if gid and gid not in group_names:
+            try:
+                group = await insforge.query("groups", filters={"id": f"eq.{gid}"}, single=True)
+                if isinstance(group, dict):
+                    group_names[gid] = group.get("name", "Unknown Group")
+            except Exception:
+                group_names[gid] = "Unknown Group"
 
     all_members = []
     for membership in memberships:
@@ -135,17 +149,51 @@ async def get_group_members(user_id: str) -> list[dict]:
             filters={"group_id": f"eq.{group_id}"},
         )
         if isinstance(members, list):
+            for m in members:
+                m["group_name"] = group_names.get(group_id, "Unknown Group")
             all_members.extend(members)
 
-    # Deduplicate by id
+    # Deduplicate by (id, group_id) — same person can be in multiple groups
     seen = set()
     unique = []
     for m in all_members:
-        mid = m.get("id")
-        if mid and mid not in seen:
-            seen.add(mid)
+        key = (m.get("id"), m.get("group_id"))
+        if key not in seen:
+            seen.add(key)
             unique.append(m)
     return unique
+
+
+async def get_user_groups(user_id: str) -> list[dict]:
+    """Get list of groups the user belongs to (id, name, type, member_count)."""
+    memberships = await insforge.query(
+        "group_members",
+        filters={"user_id": f"eq.{user_id}"},
+    )
+    if not isinstance(memberships, list):
+        memberships = [memberships] if memberships else []
+
+    groups = []
+    for membership in memberships:
+        gid = membership.get("group_id")
+        if not gid:
+            continue
+        try:
+            group = await insforge.query("groups", filters={"id": f"eq.{gid}"}, single=True)
+            if isinstance(group, dict):
+                # Count members
+                members = await insforge.query("group_members", filters={"group_id": f"eq.{gid}"})
+                count = len(members) if isinstance(members, list) else 0
+                groups.append({
+                    "id": gid,
+                    "name": group.get("name", "Unknown"),
+                    "type": group.get("type", "friends"),
+                    "member_count": count,
+                    "role": membership.get("role", "member"),
+                })
+        except Exception:
+            pass
+    return groups
 
 
 async def get_live_location(member_user_id: str) -> dict | None:

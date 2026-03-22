@@ -146,11 +146,28 @@ interface PersonLocation {
   is_stale?: boolean;
 }
 
+interface GroupMember {
+  name: string;
+  role: string;
+  user_id: string;
+}
+
+interface GroupData {
+  name: string;
+  members: GroupMember[];
+}
+
+interface GroupMembersData {
+  groups: GroupData[];
+  summary: string;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   cards?: CardData;
   personLocation?: PersonLocation;
+  groupMembers?: GroupMembersData;
 }
 
 const CATEGORY_CONFIG: Record<string, { icon: typeof Shield; color: string; bg: string }> = {
@@ -271,6 +288,10 @@ function IncidentCards({ data }: { data: CardData }) {
 }
 
 function PersonLocationCard({ data }: { data: PersonLocation }) {
+  // Hide raw coordinates — only show if we have a real address
+  const isRawCoords = /^-?\d+\.\d+,?\s*-?\d+\.\d+$/.test(data.address?.trim() || "");
+  const displayAddress = isRawCoords ? "Location available on map" : data.address;
+
   return (
     <div className="mt-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
       <div className="flex items-center gap-3">
@@ -290,7 +311,7 @@ function PersonLocationCard({ data }: { data: PersonLocation }) {
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <MapPin className="size-3 text-emerald-400" />
-            <span className="text-xs text-white/50">{data.address}</span>
+            <span className="text-xs text-white/50">{displayAddress}</span>
           </div>
           {data.updated_ago && (
             <div className="flex items-center gap-1.5 mt-0.5">
@@ -300,6 +321,50 @@ function PersonLocationCard({ data }: { data: PersonLocation }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function GroupMembersCards({ data }: { data: GroupMembersData }) {
+  return (
+    <div className="space-y-3 mt-1">
+      <p className="text-sm text-white/60">{data.summary}</p>
+      {data.groups.map((group) => (
+        <div
+          key={group.name}
+          className="rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden"
+        >
+          {/* Group header */}
+          <div className="px-4 py-2.5 border-b border-white/[0.05] flex items-center gap-2">
+            <Users className="size-3.5 text-[#7ba4ff]" />
+            <span className="text-xs font-semibold text-white/80">{group.name}</span>
+            <span className="text-[10px] text-white/30 ml-auto">
+              {group.members.length} member{group.members.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {/* Members */}
+          <div className="px-3 py-2 space-y-1">
+            {group.members.map((member) => (
+              <div
+                key={member.user_id}
+                className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors"
+              >
+                <img
+                  src={avatarUrl(member.name)}
+                  alt={member.name}
+                  className="w-7 h-7 rounded-full border border-white/10"
+                />
+                <span className="text-xs text-white/70 flex-1">{member.name}</span>
+                {member.role === "admin" && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#4d7fff]/15 text-[#7ba4ff] font-medium">
+                    Admin
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -435,6 +500,18 @@ export default function ChatPage() {
                 return updated;
               });
               setLoading(false);
+            } else if (event.type === "group_members") {
+              assistantContent = event.data.summary || "";
+              setMessages((m) => {
+                const updated = [...m];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: assistantContent,
+                  groupMembers: event.data,
+                };
+                return updated;
+              });
+              setLoading(false);
             } else if (event.type === "person_location") {
               setMessages((m) => {
                 const updated = [...m];
@@ -552,12 +629,14 @@ export default function ChatPage() {
               className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "max-w-[75%] bg-[#4d7fff] text-white whitespace-pre-wrap"
-                  : msg.cards || msg.personLocation
+                  : msg.cards || msg.personLocation || msg.groupMembers
                   ? "max-w-[90%] bg-white/[0.05] text-white/70 border border-white/[0.06] whitespace-pre-wrap"
                   : "max-w-[75%] bg-white/[0.05] text-white/70 border border-white/[0.06] whitespace-pre-wrap"
               }`}
             >
-              {msg.cards ? (
+              {msg.groupMembers ? (
+                <GroupMembersCards data={msg.groupMembers} />
+              ) : msg.cards ? (
                 <IncidentCards data={msg.cards} />
               ) : msg.content ? (
                 <>
