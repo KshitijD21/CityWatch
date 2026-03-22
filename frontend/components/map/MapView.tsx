@@ -83,17 +83,44 @@ function createMemberMarker(member: MemberPin): HTMLDivElement {
   return wrapper;
 }
 
+function buildGeoJSON(incidents: Incident[]): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: incidents.map((inc, i) => ({
+      type: "Feature" as const,
+      id: i,
+      geometry: { type: "Point" as const, coordinates: [inc.lng, inc.lat] },
+      properties: {
+        idx: i,
+        category: inc.category,
+        source: inc.source,
+        color: CATEGORY_COLORS[inc.category] || "#6b7280",
+      },
+    })),
+  };
+}
+
+const INCIDENTS_SOURCE = "incidents-source";
+const POLICE_NEWS_LAYER = "incidents-police-news";
+const POLICE_NEWS_GLOW = "incidents-police-news-glow";
+const COMMUNITY_LAYER = "incidents-community";
+const COMMUNITY_GLOW = "incidents-community-glow";
+
 export function MapView({ center, incidents, members, onIncidentClick, onMemberClick }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const incidentMarkersRef = useRef<maplibregl.Marker[]>([]);
   const memberMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const incidentsRef = useRef<Incident[]>([]);
+  const mapReady = useRef(false);
+
+  // Keep incidents ref in sync for click handler
+  incidentsRef.current = incidents;
 
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    map.current = new maplibregl.Map({
+    const m = new maplibregl.Map({
       container: mapContainer.current,
       style: DARK_STYLE,
       center: [center.lng, center.lat],
@@ -101,18 +128,125 @@ export function MapView({ center, incidents, members, onIncidentClick, onMemberC
       attributionControl: false,
     });
 
-    map.current.addControl(
+    m.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
       "bottom-right"
     );
 
+    m.on("load", () => {
+      // Add empty source
+      m.addSource(INCIDENTS_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+
+      // Glow layer for police/news (larger, blurred circle behind)
+      m.addLayer({
+        id: POLICE_NEWS_GLOW,
+        type: "circle",
+        source: INCIDENTS_SOURCE,
+        filter: ["!=", ["get", "source"], "community"],
+        paint: {
+          "circle-radius": 6,
+          "circle-color": ["get", "color"],
+          "circle-opacity": 0.25,
+          "circle-blur": 1,
+        },
+      });
+
+      // Police/news circles
+      m.addLayer({
+        id: POLICE_NEWS_LAYER,
+        type: "circle",
+        source: INCIDENTS_SOURCE,
+        filter: ["!=", ["get", "source"], "community"],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": ["get", "color"],
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "rgba(0,0,0,0.4)",
+          "circle-opacity": 0.9,
+        },
+      });
+
+      // Glow layer for community
+      m.addLayer({
+        id: COMMUNITY_GLOW,
+        type: "circle",
+        source: INCIDENTS_SOURCE,
+        filter: ["==", ["get", "source"], "community"],
+        paint: {
+          "circle-radius": 8,
+          "circle-color": ["get", "color"],
+          "circle-opacity": 0.25,
+          "circle-blur": 1,
+        },
+      });
+
+      // Community circles (slightly larger with white border)
+      m.addLayer({
+        id: COMMUNITY_LAYER,
+        type: "circle",
+        source: INCIDENTS_SOURCE,
+        filter: ["==", ["get", "source"], "community"],
+        paint: {
+          "circle-radius": 6,
+          "circle-color": ["get", "color"],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "rgba(255,255,255,0.3)",
+          "circle-opacity": 0.9,
+        },
+      });
+
+      mapReady.current = true;
+
+      // If incidents were set before map loaded, apply them now
+      if (incidentsRef.current.length > 0) {
+        const src = m.getSource(INCIDENTS_SOURCE) as maplibregl.GeoJSONSource;
+        src?.setData(buildGeoJSON(incidentsRef.current));
+      }
+    });
+
+    // Click handler for incident layers
+    const handleClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      const features = e.features;
+      if (!features || features.length === 0) return;
+      const idx = features[0].properties?.idx;
+      if (idx == null) return;
+      const incident = incidentsRef.current[idx];
+      if (!incident) return;
+
+      onIncidentClick(incident);
+      m.flyTo({ center: [incident.lng, incident.lat], zoom: 15, duration: 800 });
+    };
+
+    m.on("click", POLICE_NEWS_LAYER, handleClick);
+    m.on("click", COMMUNITY_LAYER, handleClick);
+
+    // Pointer cursor on hover
+    m.on("mouseenter", POLICE_NEWS_LAYER, () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", POLICE_NEWS_LAYER, () => { m.getCanvas().style.cursor = ""; });
+    m.on("mouseenter", COMMUNITY_LAYER, () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", COMMUNITY_LAYER, () => { m.getCanvas().style.cursor = ""; });
+
+    map.current = m;
+
     return () => {
       map.current?.remove();
       map.current = null;
+      mapReady.current = false;
     };
   }, [center]);
 
-  // Member markers
+  // Update incident data
+  useEffect(() => {
+    if (!map.current || !mapReady.current) return;
+    const src = map.current.getSource(INCIDENTS_SOURCE) as maplibregl.GeoJSONSource;
+    if (!src) return;
+    src.setData(buildGeoJSON(incidents));
+  }, [incidents]);
+
+  // Member markers (DOM-based — only a few members, fine as DOM)
   useEffect(() => {
     if (!map.current) return;
 
@@ -130,59 +264,6 @@ export function MapView({ center, incidents, members, onIncidentClick, onMemberC
       memberMarkersRef.current.push(marker);
     });
   }, [members, onMemberClick]);
-
-  // Incident markers
-  useEffect(() => {
-    if (!map.current) return;
-
-    incidentMarkersRef.current.forEach((m) => m.remove());
-    incidentMarkersRef.current = [];
-
-    incidents.forEach((incident) => {
-      const color = CATEGORY_COLORS[incident.category] || "#6b7280";
-      const isCommunity = incident.source === "community";
-      const el = document.createElement("div");
-
-      if (isCommunity) {
-        // Diamond shape for community reports
-        el.style.cssText = `
-          width: 12px;
-          height: 12px;
-          background: ${color};
-          border: 2px solid rgba(255,255,255,0.3);
-          transform: rotate(45deg);
-          cursor: pointer;
-          box-shadow: 0 0 8px ${color}60;
-        `;
-      } else {
-        // Circle for police/news
-        el.style.cssText = `
-          width: 10px;
-          height: 10px;
-          background: ${color};
-          border: 1.5px solid rgba(0,0,0,0.4);
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 0 6px ${color}50;
-        `;
-      }
-
-      el.addEventListener("click", () => {
-        onIncidentClick(incident);
-        map.current?.flyTo({
-          center: [incident.lng, incident.lat],
-          zoom: 15,
-          duration: 800,
-        });
-      });
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([incident.lng, incident.lat])
-        .addTo(map.current!);
-
-      incidentMarkersRef.current.push(marker);
-    });
-  }, [incidents, onIncidentClick]);
 
   return <div ref={mapContainer} className="w-full h-full" />;
 }

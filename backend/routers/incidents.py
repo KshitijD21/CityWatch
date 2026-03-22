@@ -1,6 +1,11 @@
 from fastapi import APIRouter, BackgroundTasks, Query
 from services.insforge_service import insforge
 import math
+import sys
+
+def log(msg: str):
+    sys.stderr.write(f"{msg}\n")
+    sys.stderr.flush()
 
 router = APIRouter()
 
@@ -55,35 +60,59 @@ async def trigger_scrape(
 async def get_nearby_incidents(
     lat: float = Query(...),
     lng: float = Query(...),
-    radius: float = Query(5, description="Radius in miles"),
-    limit: int = Query(200),
+    radius: float = Query(10, description="Radius in miles"),
+    limit: int = Query(10000),
 ):
     """Get incidents within radius of a point."""
+    log("=" * 60)
+    log(f"GET /nearby — center=({lat}, {lng}), radius={radius}mi, limit={limit}")
+
     # Approximate bounding box for filtering (1 degree ≈ 69 miles)
     delta = radius / 69.0
-    filters = {
-        "lat": f"gte.{lat - delta}",
-        "lng": f"gte.{lng - delta}",
+    bbox = {
+        "lat_min": round(lat - delta, 6),
+        "lat_max": round(lat + delta, 6),
+        "lng_min": round(lng - delta, 6),
+        "lng_max": round(lng + delta, 6),
     }
+    log(f"Bounding box: lat[{bbox['lat_min']} → {bbox['lat_max']}], lng[{bbox['lng_min']} → {bbox['lng_max']}]")
 
-    # Fetch from DB with bounding box (default limit is 100, need more)
+    # Use raw_params to support duplicate keys for proper bounding box
+    raw_params = [
+        ("lat", f"gte.{bbox['lat_min']}"),
+        ("lat", f"lte.{bbox['lat_max']}"),
+        ("lng", f"gte.{bbox['lng_min']}"),
+        ("lng", f"lte.{bbox['lng_max']}"),
+    ]
+
     rows = await insforge.query(
         "incidents",
-        filters=filters,
-        limit=1000,
+        raw_params=raw_params,
+        order="occurred_at.desc",
+        limit=limit,
     )
+    log(f"DB returned {len(rows)} rows (limit={limit})")
+
+    if rows:
+        lats = [r["lat"] for r in rows]
+        lngs = [r["lng"] for r in rows]
+        log(f"DB rows lat range: [{min(lats):.4f} → {max(lats):.4f}], lng range: [{min(lngs):.4f} → {max(lngs):.4f}]")
+        log(f"DB rows date range: {rows[-1].get('occurred_at', '?')} → {rows[0].get('occurred_at', '?')}")
 
     # Calculate exact Haversine distance
     results = []
+    max_dist = 0.0
     for row in rows:
         dist = haversine_distance(lat, lng, row["lat"], row["lng"])
         if dist <= radius:
             row["distance_miles"] = round(dist, 2)
             results.append(row)
+            max_dist = max(max_dist, dist)
 
-    # Sort by most recent
-    results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
-    results = results[:limit]
+    log(f"After haversine filter: {len(results)} incidents (dropped {len(rows) - len(results)} outside {radius}mi circle)")
+    log(f"Max distance in results: {max_dist:.2f}mi")
+    log("=" * 60)
+
     await _attach_community_images(results)
     return results
 
@@ -97,13 +126,15 @@ async def get_incidents_in_bounds(
     limit: int = Query(200),
 ):
     """Get incidents within map viewport bounds."""
-    filters = {
-        "lat": f"gte.{south}",
-        "lng": f"gte.{west}",
-    }
-    rows = await insforge.query("incidents", filters=filters, limit=1000)
+    raw_params = [
+        ("lat", f"gte.{south}"),
+        ("lat", f"lte.{north}"),
+        ("lng", f"gte.{west}"),
+        ("lng", f"lte.{east}"),
+    ]
+    rows = await insforge.query("incidents", raw_params=raw_params, limit=5000)
 
-    results = [r for r in rows if r["lat"] <= north and r["lng"] <= east]
+    results = rows
     results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
     results = results[:limit]
     await _attach_community_images(results)

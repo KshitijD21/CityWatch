@@ -68,7 +68,7 @@ export default function MapPage() {
     if (!userLocation) return;
 
     apiFetch(
-      `/api/incidents/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=5`
+      `/api/incidents/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=10`
     )
       .then((data) => setIncidents(Array.isArray(data) ? data : []))
       .catch(() => {});

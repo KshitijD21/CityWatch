@@ -1,5 +1,14 @@
 # Progress Log
 
+## 2026-03-22 — Fix /nearby incidents bounding box + 25-mile radius + WebGL rendering
+
+### Files Changed
+
+- `backend/services/insforge_service.py` — `query()`: added `raw_params` parameter (list of tuples) to support duplicate query keys for PostgREST range filters on same column
+- `backend/routers/incidents.py` — `get_nearby_incidents()`: switched from broken dict filters to `raw_params` with proper `gte`+`lte` bounds on both lat/lng; changed default radius from 5→25 miles, limit from 200→50000; `get_incidents_in_bounds()`: same raw_params fix
+- `frontend/app/map/page.tsx` — changed `/api/incidents/nearby` radius param from 5 to 25 miles
+- `frontend/components/map/MapView.tsx` — replaced DOM-based Marker per incident (crashed at 28k) with MapLibre GeoJSON source + circle layers (GPU-rendered); `buildGeoJSON()` converts incidents array to FeatureCollection; 4 layers: police/news circles + glow, community circles + glow; click/hover handlers via map layer events; member markers stay DOM-based (small count)
+
 ## 2026-03-22 — Member Profile Panel (click user on map)
 
 ### Files Added
