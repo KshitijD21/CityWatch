@@ -16,7 +16,6 @@ import {
   Newspaper,
   Users,
   CheckCircle2,
-  Calendar,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { MemberPin } from "./MapView";
@@ -118,14 +117,19 @@ export function MemberProfilePanel({ member, onClose }: MemberProfilePanelProps)
               {address || `${member.lat.toFixed(4)}, ${member.lng.toFixed(4)}`}
             </span>
           </div>
-          {member.updated_at && (
-            <div className="flex items-center gap-1.5 mt-1">
-              <Calendar className="size-3 text-white/30 shrink-0" />
-              <span className="text-xs text-white/40">
-                Last seen {getTimeAgo(member.updated_at)}
+          {(() => {
+            const isOnline = member.isYou || (member.updated_at && (Date.now() - new Date(member.updated_at).getTime()) < 5 * 60 * 1000);
+            return (
+              <span className={`inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                isOnline
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-white/[0.04] text-white/30"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400" : "bg-white/20"}`} />
+                {isOnline ? "Active now" : `Last seen ${member.updated_at ? getTimeAgo(member.updated_at) : "unknown"}`}
               </span>
-            </div>
-          )}
+            );
+          })()}
         </div>
         <button
           onClick={onClose}
