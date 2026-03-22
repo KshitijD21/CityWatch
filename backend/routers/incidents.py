@@ -56,24 +56,27 @@ async def get_nearby_incidents(
     lat: float = Query(...),
     lng: float = Query(...),
     radius: float = Query(5, description="Radius in miles"),
-    limit: int = Query(200),
 ):
     """Get incidents within radius of a point."""
     # Approximate bounding box for filtering (1 degree ≈ 69 miles)
     delta = radius / 69.0
     filters = {
-        "and": f"(lat.gte.{lat - delta},lat.lte.{lat + delta},lng.gte.{lng - delta},lng.lte.{lng + delta})",
+        "lat": f"gte.{lat - delta}",
+        "lng": f"gte.{lng - delta}",
     }
 
-    # Fetch from DB with full bounding box
+    # Fetch from DB with bounding box (InsForge default limit is 100)
     rows = await insforge.query(
         "incidents",
         filters=filters,
+        limit=1000,
     )
 
-    # Calculate exact Haversine distance
+    # Filter upper bounds + calculate exact Haversine distance
     results = []
     for row in rows:
+        if row["lat"] > lat + delta or row["lng"] > lng + delta:
+            continue
         dist = haversine_distance(lat, lng, row["lat"], row["lng"])
         if dist <= radius:
             row["distance_miles"] = round(dist, 2)
@@ -81,7 +84,6 @@ async def get_nearby_incidents(
 
     # Sort by most recent
     results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
-    results = results[:limit]
     await _attach_community_images(results)
     return results
 
@@ -92,17 +94,16 @@ async def get_incidents_in_bounds(
     south: float = Query(...),
     east: float = Query(...),
     west: float = Query(...),
-    limit: int = Query(200),
 ):
     """Get incidents within map viewport bounds."""
     filters = {
-        "and": f"(lat.gte.{south},lat.lte.{north},lng.gte.{west},lng.lte.{east})",
+        "lat": f"gte.{south}",
+        "lng": f"gte.{west}",
     }
-    rows = await insforge.query("incidents", filters=filters)
+    rows = await insforge.query("incidents", filters=filters, limit=1000)
 
-    results = list(rows) if isinstance(rows, list) else [rows]
+    results = [r for r in rows if r["lat"] <= north and r["lng"] <= east]
     results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
-    results = results[:limit]
     await _attach_community_images(results)
     return results
 
@@ -114,7 +115,7 @@ async def get_incident_stats(
     radius: float = Query(5),
 ):
     """Get aggregated stats for an area."""
-    incidents = await get_nearby_incidents(lat=lat, lng=lng, radius=radius, limit=1000)
+    incidents = await get_nearby_incidents(lat=lat, lng=lng, radius=radius)
 
     by_category: dict[str, int] = {}
     by_source: dict[str, int] = {}
