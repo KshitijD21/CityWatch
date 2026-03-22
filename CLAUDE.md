@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-StreetSense is a real-time safety awareness app with a live map showing sourced incident data, AI-powered chat/area briefs, and community reporting with verification. Built for HackASU (March 20-22, 2026).
+CityWatch is a real-time safety awareness app with a live map showing sourced incident data, AI-powered chat/area briefs, and community reporting with verification. Built for HackASU (March 20-22, 2026).
 
 ## Commands
 
@@ -29,9 +29,10 @@ cd backend && python -m venv venv && source venv/bin/activate && pip install -r 
 **Frontend (Next.js 16 / TypeScript)** → **Backend (FastAPI / Python)** → **InsForge (BaaS: PostgreSQL + Auth + Storage)**
 
 - Frontend calls backend API at `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`)
-- Backend proxies all database operations through InsForge's PostgREST API via `InsForgeClient` in `backend/services/insforge_service.py`
-- Auth: InsForge issues JWT tokens (HS256). Backend verifies with `INSFORGE_JWT_SECRET` in `backend/utils/helpers.py`. User ID is in `token_payload["sub"]`
-- All backend routes are prefixed with `/api/` — 8 routers: auth, incidents, chat, briefs, reports, groups, places, location, geocode
+- Backend proxies all database operations through InsForge's REST API (`/api/database/records/{table}`) via `InsForgeClient` in `backend/services/insforge_service.py`
+- Auth: InsForge issues JWT tokens. Backend validates tokens server-side via InsForge's `/api/auth/sessions/current` endpoint in `backend/utils/helpers.py`. User ID is in `payload["sub"]`
+- InsForge auth endpoints: `/api/auth/users` (signup), `/api/auth/sessions` (login), `/api/auth/oauth/{provider}` (OAuth)
+- All backend routes are prefixed with `/api/` — 9 routers: auth, incidents, chat, briefs, reports, groups, places, location, geocode
 
 ### InsForge Integration Rules
 
@@ -59,6 +60,6 @@ Defined in `scripts/schema.sql`. Key tables: users, groups, group_members, saved
 
 Frontend needs: `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
 
-Backend needs: `ANTHROPIC_API_KEY`, `MAPBOX_TOKEN`, `TINYFISH_API_KEY`, `DATABASE_URL`, `INSFORGE_URL`, `INSFORGE_API_KEY`, `INSFORGE_JWT_SECRET`
+Backend needs: `ANTHROPIC_API_KEY`, `MAPBOX_TOKEN`, `TINYFISH_API_KEY`, `INSFORGE_URL`, `INSFORGE_API_KEY`
 
 See `.env.example` for the full template.
