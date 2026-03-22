@@ -106,24 +106,36 @@ class InsForgeClient:
         *,
         select: str = "*",
         filters: dict | None = None,
+        raw_params: list[tuple[str, str]] | None = None,
         order: str | None = None,
         limit: int | None = None,
         token: str | None = None,
         single: bool = False,
     ) -> list | dict:
         client = await self._get_client()
-        params: dict[str, str] = {"select": select}
-        params.update(self._build_filters(filters))
-        if order:
-            params["order"] = order
-        if limit is not None:
-            params["limit"] = str(limit)
+        if raw_params is not None:
+            # Use raw list-of-tuples for params that need duplicate keys
+            params_list: list[tuple[str, str]] = [("select", select)]
+            params_list.extend(raw_params)
+            if order:
+                params_list.append(("order", order))
+            if limit is not None:
+                params_list.append(("limit", str(limit)))
+            query_params: dict[str, str] | list[tuple[str, str]] = params_list
+        else:
+            params_dict: dict[str, str] = {"select": select}
+            params_dict.update(self._build_filters(filters))
+            if order:
+                params_dict["order"] = order
+            if limit is not None:
+                params_dict["limit"] = str(limit)
+            query_params = params_dict
         headers = self._auth_headers(token)
         if single:
             headers["Accept"] = "application/vnd.pgrst.object+json"
         resp = await client.get(
             f"/api/database/records/{table}",
-            params=params,
+            params=query_params,
             headers=headers,
         )
         if resp.status_code >= 400:
