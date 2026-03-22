@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 # Import and register routers
-from routers import incidents, chat, briefs, reports, auth, groups, places, location, geocode
+from routers import incidents, chat, briefs, reports, auth, groups, places, location, geocode, alerts
 
 app.include_router(incidents.router, prefix="/api/incidents", tags=["incidents"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
@@ -45,6 +45,7 @@ app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
 app.include_router(places.router, prefix="/api/places", tags=["places"])
 app.include_router(location.router, prefix="/api/location", tags=["location"])
 app.include_router(geocode.router, prefix="/api/geocode", tags=["geocode"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 
 @app.get("/api/health")
 def health():

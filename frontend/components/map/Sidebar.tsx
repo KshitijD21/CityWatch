@@ -14,8 +14,10 @@ import {
   ShieldCheck,
   Radio,
   LogOut,
+  Bell,
 } from "lucide-react";
 import { useAuthContext } from "@/context/AuthContext";
+import { useAlertCount, AlertsPanel } from "./AlertsPanel";
 
 const navItems = [
   { icon: Map, label: "Map", href: "/map" },
@@ -29,13 +31,16 @@ interface SidebarProps {
   incidentCount: number;
   sharing?: boolean;
   onToggleSharing?: () => void;
+  alertsOpen?: boolean;
+  onToggleAlerts?: () => void;
 }
 
-export function Sidebar({ incidentCount, sharing, onToggleSharing }: SidebarProps) {
+export function Sidebar({ incidentCount, sharing, onToggleSharing, alertsOpen, onToggleAlerts }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthContext();
   const [profileOpen, setProfileOpen] = useState(false);
+  const alertCount = useAlertCount();
   const profileRef = useRef<HTMLDivElement>(null);
 
   // Close popover on outside click
@@ -113,6 +118,35 @@ export function Sidebar({ incidentCount, sharing, onToggleSharing }: SidebarProp
 
       {/* Bottom actions */}
       <div className="px-2 py-3 border-t border-white/[0.06] space-y-1">
+        {/* Alerts */}
+        {onToggleAlerts && (
+          <div className="relative">
+            <button
+              onClick={onToggleAlerts}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm w-full cursor-pointer transition-colors ${
+                alertsOpen
+                  ? "bg-[#4d7fff]/10 text-[#7ba4ff]"
+                  : "text-white/40 hover:text-white/70 hover:bg-white/[0.03]"
+              }`}
+            >
+              <div className="relative">
+                <Bell className="size-[18px] shrink-0" />
+                {alertCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 text-[8px] font-bold text-white flex items-center justify-center">
+                    {alertCount > 9 ? "9+" : alertCount}
+                  </span>
+                )}
+              </div>
+              <span className="hidden sm:block">Alerts</span>
+            </button>
+            {alertsOpen && (
+              <div className="absolute bottom-0 left-full ml-2">
+                <AlertsPanel onClose={onToggleAlerts} />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Profile with popover */}
         <div ref={profileRef} className="relative">
           <button

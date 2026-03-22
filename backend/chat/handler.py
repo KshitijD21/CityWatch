@@ -281,16 +281,16 @@ def _extract_days_from_message(message: str) -> int | None:
 
 
 async def _enrich_incidents_with_location(incidents: list[dict]) -> list[dict]:
-    """Add location_name to each incident via reverse geocoding."""
-    if not incidents:
-        return incidents
-    coords = [(inc["lat"], inc["lng"]) for inc in incidents if "lat" in inc and "lng" in inc]
-    if not coords:
-        return incidents
-    geo_map = await reverse_geocode_batch(coords)
+    """Add location_name to each incident. Uses description street names
+    instead of reverse geocoding to avoid Nominatim rate limits."""
     for inc in incidents:
-        key = f"{inc['lat']:.4f},{inc['lng']:.4f}"
-        inc["location_name"] = geo_map.get(key, f"{inc['lat']:.4f}, {inc['lng']:.4f}")
+        # Extract location from description (e.g., "FIGHT at 12XX N 40TH ST — ...")
+        desc = inc.get("description", "")
+        if " at " in desc:
+            loc = desc.split(" at ", 1)[1].split(" — ")[0].split(" --")[0].strip()
+            inc["location_name"] = loc
+        else:
+            inc["location_name"] = f"{inc.get('lat', 0):.4f}, {inc.get('lng', 0):.4f}"
     return incidents
 
 
