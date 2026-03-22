@@ -67,7 +67,13 @@ export default function MapPage() {
       .catch(() => {});
   }, [userLocation]);
 
-  const members: MemberPin[] = realMembers;
+  // Show real members, always include "You" pin
+  const members: MemberPin[] = userLocation
+    ? [
+        { name: user?.name || "You", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
+        ...realMembers.filter((m) => !m.isYou),
+      ]
+    : realMembers;
 
   if (!userLocation) {
     return (
