@@ -1,5 +1,13 @@
 # Progress Log
 
+## 2026-03-22 — Fix: skip onboarding for users already in a group
+
+### Files Changed
+
+- `frontend/app/login/page.tsx`
+  - `handleSubmit()` — when `onboarded` is false, checks `GET /api/groups` before redirecting; if user has groups (joined via invite), marks onboarded and goes to `/map` instead of `/onboarding`
+  - Added `apiFetch` import
+
 ## 2026-03-22 — README: expanded AI chat section
 
 ### Files Changed
