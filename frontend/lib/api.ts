@@ -15,7 +15,9 @@ export async function apiFetch(path: string, options?: RequestInit) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  // Ensure trailing slash to avoid 307 redirects from FastAPI
+  const normalizedPath = path.endsWith("/") ? path : `${path}/`;
+  const res = await fetch(`${API_URL}${normalizedPath}`, { ...options, headers });
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -33,7 +35,8 @@ export async function apiStream(path: string, body: unknown, token?: string) {
   };
   if (t) headers["Authorization"] = `Bearer ${t}`;
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const normalizedPath = path.endsWith("/") ? path : `${path}/`;
+  const res = await fetch(`${API_URL}${normalizedPath}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
