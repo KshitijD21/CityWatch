@@ -19,6 +19,22 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+async def _attach_community_images(incidents: list) -> None:
+    """Attach image_url from community_reports to community-sourced incidents."""
+    community_ids = [r["id"] for r in incidents if r.get("source") == "community"]
+    if not community_ids:
+        return
+    reports = await insforge.query(
+        "community_reports",
+        select="linked_incident_id,image_url",
+        filters={"linked_incident_id": f"in.({','.join(community_ids)})"},
+    )
+    image_map = {r["linked_incident_id"]: r.get("image_url") for r in reports if r.get("image_url")}
+    for r in incidents:
+        if r["id"] in image_map:
+            r["image_url"] = image_map[r["id"]]
+
+
 @router.post("/scrape")
 async def trigger_scrape(
     background_tasks: BackgroundTasks,
@@ -69,7 +85,9 @@ async def get_nearby_incidents(
 
     # Sort by most recent
     results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
-    return results[:limit]
+    results = results[:limit]
+    await _attach_community_images(results)
+    return results
 
 
 @router.get("/bounds")
@@ -89,7 +107,9 @@ async def get_incidents_in_bounds(
 
     results = [r for r in rows if r["lat"] <= north and r["lng"] <= east]
     results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
-    return results[:limit]
+    results = results[:limit]
+    await _attach_community_images(results)
+    return results
 
 
 @router.get("/stats")
@@ -125,4 +145,6 @@ async def get_incident(incident_id: str):
         filters={"id": f"eq.{incident_id}"},
         single=True,
     )
+
+    await _attach_community_images([result])
     return result
