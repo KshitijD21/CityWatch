@@ -32,6 +32,16 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Expired if less than 60s remaining
+    return Date.now() >= (payload.exp * 1000) - 60_000;
+  } catch {
+    return true;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -54,7 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Restore session on mount
   useEffect(() => {
     async function restoreSession() {
-      // Try SDK refresh via httpOnly cookie (works in production on HTTPS)
+      const saved = localStorage.getItem('token');
+
+      // 1. If token exists and is still valid, use it directly (no refresh call)
+      if (saved && !isTokenExpired(saved)) {
+        await fetchUser(saved);
+        return;
+      }
+
+      // 2. Token expired or missing — try SDK refresh via httpOnly cookie
       const { data } = await insforge.auth
         .refreshSession()
         .catch(() => ({ data: null }));
@@ -63,13 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchUser(data.accessToken);
         return;
       }
-      // Dev fallback: use stored token from localStorage
-      const saved = localStorage.getItem('token');
-      if (saved) {
-        fetchUser(saved);
-      } else {
-        setState((s) => ({ ...s, loading: false }));
-      }
+
+      // 3. Refresh failed — clean up stale token
+      if (saved) localStorage.removeItem('token');
+      setState((s) => ({ ...s, loading: false }));
     }
     restoreSession();
   }, [fetchUser]);
@@ -77,18 +92,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Keep session alive — refresh token on interval and tab focus
   useEffect(() => {
     async function refreshToken() {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
       const { data } = await insforge.auth
         .refreshSession()
         .catch(() => ({ data: null }));
       if (data?.accessToken) {
         localStorage.setItem('token', data.accessToken);
+        setState((s) => s.user ? { ...s, token: data.accessToken } : s);
       }
     }
 
+    // Refresh every 10 min while tab is active (well before 15-min expiry)
     const interval = setInterval(refreshToken, 10 * 60 * 1000);
 
     function onFocus() {
-      refreshToken();
+      const token = localStorage.getItem('token');
+      // Only refresh on focus if token is expired or close to expiry
+      if (token && isTokenExpired(token)) {
+        refreshToken();
+      }
     }
     window.addEventListener('focus', onFocus);
 
