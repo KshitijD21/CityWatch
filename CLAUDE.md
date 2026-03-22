@@ -74,6 +74,39 @@ Defined in `scripts/schema.sql`. Key tables: users, groups, group_members, saved
 
 Frontend needs: `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
 
-Backend needs: `ANTHROPIC_API_KEY`, `MAPBOX_TOKEN`, `TINYFISH_API_KEY`, `INSFORGE_URL`, `INSFORGE_API_KEY`
+Backend needs: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MAPBOX_TOKEN`, `TINYFISH_API_KEY`, `INSFORGE_URL`, `INSFORGE_API_KEY`, `DEFAULT_USER_ID` (optional, dev/demo auth bypass)
 
 See `.env.example` for the full template.
+
+## Rules
+
+### Progress Tracking (MANDATORY)
+After every prompt where you add, change, or remove files, update `refer/progress.md`:
+- Add a dated section header (e.g., `## 2026-03-21 — Feature Name`)
+- Under **Files Added**: list each new file with a one-liner per function/class describing what it does
+- Under **Files Changed**: list each modified file with what was changed (function names, config keys, etc.)
+- Under **Files Removed**: list any deleted files
+- NO paragraphs — bullet points only, concise, function-level detail
+
+### Chat Module
+- Chat backend lives in `backend/chat/` (separate module, not in routers/ except the thin router)
+- Two lanes: Lane 1 (simple location queries, cheap model), Lane 2 (people/ReAct, smarter model)
+- Currently using OpenAI (gpt-4o-mini / gpt-4o) — will switch to Claude later
+- Test UI at `frontend/app/test/chat/` — temporary, will be replaced by real chat UI
+- Card mode is built server-side from real DB data — LLM only generates the summary sentence. LLM NEVER generates card JSON.
+- `_should_show_cards()` in handler.py detects card intent — only explicit phrases like "show incidents", "list incidents". Skips if a person name is in the message.
+- Reverse geocoding via Mapbox converts lat/lng to street names for: incident cards (Lane 1), people locations (Lane 2 ReAct tools), and incident results in ReAct tools
+- `DEFAULT_USER_ID` env var skips auth — `get_optional_user()` falls back to this user ID
+- Location fallback chain: geocode message → extract location from patterns ("near X", "Is X safe") → session location (for follow-ups) → GPS (only for "near me") → user's live location → saved home → default Phoenix
+- Personal queries ("my name", "who am i", "my group") route to Lane 2 for profile-aware answers
+- `get_user_profile()` in data_access.py fetches user row; injected into both lane prompts as CURRENT USER context
+- `_extract_radius_from_message()` parses user-requested radius (e.g. "20 miles"), capped at 25mi
+- `_extract_days_from_message()` parses time ranges: "today" (1d), "last week" (7d), "last 3 months" (90d), "last year" (365d), hours ("last 48 hr", "24 hours"), date ranges ("from march 10 to march 20", "from 20 march to now"), "since march 10". Default is 7 days when user doesn't specify.
+- Session state preserves `last_days` and `last_radius` — follow-up queries ("I want details") reuse the previous time window and radius instead of resetting to defaults.
+- Lane 1 text mode streams + collects tokens in one pass (no double LLM call)
+- ReAct tool `get_live_location` returns `address` (reverse geocoded), `updated_ago` (relative), `is_stale` flag — never raw coords/timestamps
+- ReAct tool `get_nearby_incidents` returns `location_name` and `occurred_ago` on each incident
+- `run_react_loop()` returns `ReActResult` with answer + resolved locations; `handle_lane2()` saves resolved lat/lng to session so follow-ups ("check around 20 miles") use the correct center point
+- Both lane prompts instruct LLM to never show raw lat/lng or UTC timestamps, always use street names and relative times
+- Reverse geocoding tries 3 Mapbox type sets progressively: address/poi → neighborhood/locality → place (avoids raw coords fallback)
+- `handle_lane2()` resolves person location from 3 sources: ReAct tool calls → prefetched_locations[mentioned_person] → prefetched_locations[session.last_person] (for pronoun follow-ups)
