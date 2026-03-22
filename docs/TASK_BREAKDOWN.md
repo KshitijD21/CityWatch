@@ -602,7 +602,7 @@ Removes a member from the group.
 **Frontend integration notes:**
 - Invite codes are 6-char uppercase alphanumeric (e.g. `Q7UJYW`)
 - Placeholder members have `user_id: null` — they get linked when joining via invite code if display_name matches
-- `sharing_location` defaults to `false` for new members
+- `sharing_location` defaults to `true` for new members (changed via migration 004)
 - Group type is `"family"` or `"friends"`
 
 ## B9. (Ronak) SAVED PLACES ENDPOINTS (Auth Required)
