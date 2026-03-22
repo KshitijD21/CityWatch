@@ -12,7 +12,10 @@ import {
   User,
   ShieldCheck,
   Radio,
+  LogOut,
 } from "lucide-react";
+import { useAuthContext } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 const navItems = [
   { icon: Map, label: "Map", href: "/map" },
@@ -30,6 +33,13 @@ interface SidebarProps {
 
 export function Sidebar({ incidentCount, sharing, onToggleSharing }: SidebarProps) {
   const pathname = usePathname();
+  const { logout } = useAuthContext();
+  const router = useRouter();
+
+  function handleLogout() {
+    logout();
+    router.push("/login");
+  }
 
   return (
     <div className="w-16 sm:w-60 h-full flex flex-col border-r border-white/[0.06] bg-[#0c0c14] shrink-0">
@@ -95,6 +105,13 @@ export function Sidebar({ incidentCount, sharing, onToggleSharing }: SidebarProp
         <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-colors w-full cursor-pointer">
           <User className="size-[18px] shrink-0" />
           <span className="hidden sm:block">Profile</span>
+        </button>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors w-full cursor-pointer"
+        >
+          <LogOut className="size-[18px] shrink-0" />
+          <span className="hidden sm:block">Log Out</span>
         </button>
       </div>
     </div>
