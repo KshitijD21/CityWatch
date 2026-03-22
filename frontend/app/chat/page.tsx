@@ -33,85 +33,188 @@ function renderBold(text: string) {
 
 const TIP_ICONS = [Shield, Eye, ShieldAlert, AlertTriangle, Car, MapPin, Users, Wrench];
 
+interface Section {
+  heading?: string;
+  lines: string[];
+}
+
 function RichTextCard({ text }: { text: string }) {
-  const lines = text.split("\n").filter((l) => l.trim());
+  const rawLines = text.split("\n");
 
-  // Separate numbered items from other text
-  const intro: string[] = [];
-  const tips: { title: string; body: string }[] = [];
-  const outro: string[] = [];
-  let pastTips = false;
+  // Parse into sections split by markdown headers (### or **)
+  const sections: Section[] = [];
+  let current: Section = { lines: [] };
 
-  for (const line of lines) {
-    const match = line.match(/^\d+\.\s*\*?\*?(.+)/);
-    if (match) {
-      // Parse "**Title**: body" or "Title: body"
-      const content = match[1];
-      const colonMatch = content.match(/^\*?\*?([^:*]+)\*?\*?[:\s]*(.*)$/);
-      if (colonMatch) {
-        tips.push({ title: colonMatch[1].trim(), body: colonMatch[2].trim() });
-      } else {
-        tips.push({ title: content.replace(/\*\*/g, "").trim(), body: "" });
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Detect headers: "### Name", "**Name**", "## Name"
+    const h3Match = trimmed.match(/^#{2,3}\s+(.+)/);
+    const boldOnlyMatch = trimmed.match(/^\*\*([^*]+)\*\*$/);
+
+    if (h3Match || boldOnlyMatch) {
+      if (current.heading || current.lines.length > 0) {
+        sections.push(current);
       }
-    } else if (tips.length === 0) {
-      intro.push(line.trim());
+      current = {
+        heading: (h3Match?.[1] || boldOnlyMatch?.[1] || "").trim(),
+        lines: [],
+      };
     } else {
-      pastTips = true;
-      outro.push(line.trim());
+      current.lines.push(trimmed);
     }
   }
+  if (current.heading || current.lines.length > 0) {
+    sections.push(current);
+  }
 
-  // If no structured tips found, just render as styled paragraphs
-  if (tips.length === 0) {
+  // Check if we have a multi-section layout (person headers)
+  const hasHeaders = sections.some((s) => s.heading);
+
+  if (!hasHeaders) {
+    // Simple mode: numbered items → cards, otherwise paragraphs
+    const tips: { title: string; body: string }[] = [];
+    const intro: string[] = [];
+    const outro: string[] = [];
+
+    for (const line of sections.flatMap((s) => s.lines)) {
+      const match = line.match(/^\d+\.\s*\*?\*?(.+)/);
+      if (match) {
+        const content = match[1];
+        const colonMatch = content.match(/^\*?\*?([^:*]+)\*?\*?[:\s]*(.*)$/);
+        if (colonMatch) {
+          tips.push({ title: colonMatch[1].trim(), body: colonMatch[2].trim() });
+        } else {
+          tips.push({ title: content.replace(/\*\*/g, "").trim(), body: "" });
+        }
+      } else if (tips.length === 0) {
+        intro.push(line);
+      } else {
+        outro.push(line);
+      }
+    }
+
+    if (tips.length === 0) {
+      return (
+        <div className="space-y-2">
+          {sections.flatMap((s) => s.lines).map((line, i) => (
+            <p key={i} className="text-sm text-white/60 leading-relaxed">
+              {renderBold(line)}
+            </p>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-3">
-        {lines.map((line, i) => (
-          <p key={i} className="text-sm text-white/60 leading-relaxed">
+        {intro.map((line, i) => (
+          <p key={`i-${i}`} className="text-sm text-white/60 leading-relaxed">
             {renderBold(line)}
           </p>
+        ))}
+        <div className="space-y-2 mt-1">
+          {tips.map((tip, i) => {
+            const Icon = TIP_ICONS[i % TIP_ICONS.length];
+            return (
+              <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.04]">
+                <div className="w-7 h-7 rounded-lg bg-[#4d7fff]/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Icon className="size-3.5 text-[#7ba4ff]" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-white/80">{tip.title}</p>
+                  {tip.body && <p className="text-[11px] text-white/40 mt-0.5 leading-relaxed">{tip.body}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {outro.map((line, i) => (
+          <p key={`o-${i}`} className="text-[11px] text-white/30 leading-relaxed">{renderBold(line)}</p>
         ))}
       </div>
     );
   }
 
+  // Multi-section mode: render person/section headers with their content
   return (
     <div className="space-y-3">
-      {/* Intro */}
-      {intro.map((line, i) => (
-        <p key={`intro-${i}`} className="text-sm text-white/60 leading-relaxed">
-          {renderBold(line)}
-        </p>
-      ))}
+      {sections.map((section, si) => {
+        if (!section.heading) {
+          // Intro or outro text (no header)
+          return section.lines.map((line, li) => {
+            // Disclaimer-style lines at the end
+            const isDisclaimer = line.toLowerCase().includes("based on reported data");
+            return (
+              <p key={`t-${si}-${li}`} className={`text-sm leading-relaxed ${isDisclaimer ? "text-white/30 text-[11px]" : "text-white/60"}`}>
+                {renderBold(line)}
+              </p>
+            );
+          });
+        }
 
-      {/* Tips as cards */}
-      <div className="space-y-2 mt-1">
-        {tips.map((tip, i) => {
-          const Icon = TIP_ICONS[i % TIP_ICONS.length];
-          return (
-            <div
-              key={i}
-              className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.04]"
-            >
-              <div className="w-7 h-7 rounded-lg bg-[#4d7fff]/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Icon className="size-3.5 text-[#7ba4ff]" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-white/80">{tip.title}</p>
-                {tip.body && (
-                  <p className="text-[11px] text-white/40 mt-0.5 leading-relaxed">{tip.body}</p>
-                )}
-              </div>
+        // Section with a heading (person card)
+        // Separate location line, bullet/numbered items, and other text
+        const locationLines: string[] = [];
+        const items: { text: string }[] = [];
+        const otherLines: string[] = [];
+
+        for (const line of section.lines) {
+          if (line.match(/^[-•]\s+/) || line.match(/^\d+\.\s+/)) {
+            items.push({ text: line.replace(/^[-•]\s+/, "").replace(/^\d+\.\s+/, "") });
+          } else if (
+            line.toLowerCase().includes("location:") ||
+            line.toLowerCase().includes("is near") ||
+            line.toLowerCase().includes("last updated")
+          ) {
+            locationLines.push(line);
+          } else {
+            otherLines.push(line);
+          }
+        }
+
+        return (
+          <div key={`s-${si}`} className="rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden">
+            {/* Person header */}
+            <div className="px-4 py-2.5 border-b border-white/[0.05] flex items-center gap-2.5">
+              <img
+                src={avatarUrl(section.heading)}
+                alt={section.heading}
+                className="w-7 h-7 rounded-full border border-white/10"
+              />
+              <span className="text-sm font-semibold text-white/90">{section.heading}</span>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Outro / disclaimer */}
-      {outro.map((line, i) => (
-        <p key={`outro-${i}`} className="text-[11px] text-white/30 leading-relaxed">
-          {renderBold(line)}
-        </p>
-      ))}
+            <div className="px-4 py-3 space-y-2">
+              {/* Location info */}
+              {locationLines.map((line, li) => (
+                <div key={`loc-${li}`} className="flex items-center gap-1.5">
+                  <MapPin className="size-3 text-emerald-400 shrink-0" />
+                  <span className="text-xs text-white/50">{renderBold(line.replace(/^-?\s*location:\s*/i, ""))}</span>
+                </div>
+              ))}
+              {/* Incident items */}
+              {items.length > 0 && (
+                <div className="space-y-1.5 mt-1">
+                  {items.map((item, ii) => {
+                    const Icon = TIP_ICONS[ii % TIP_ICONS.length];
+                    return (
+                      <div key={`item-${ii}`} className="flex items-start gap-2.5 px-2 py-1.5 rounded-lg bg-white/[0.02]">
+                        <Icon className="size-3 text-[#7ba4ff] shrink-0 mt-0.5" />
+                        <span className="text-xs text-white/50 leading-relaxed">{renderBold(item.text)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Other text */}
+              {otherLines.map((line, oi) => (
+                <p key={`ot-${oi}`} className="text-xs text-white/40 leading-relaxed">{renderBold(line)}</p>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
