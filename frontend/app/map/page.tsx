@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapView } from "@/components/map/MapView";
+import { MapView, type MemberPin } from "@/components/map/MapView";
 import { Sidebar } from "@/components/map/Sidebar";
 import { IncidentCard } from "@/components/map/IncidentCard";
+import { Legend } from "@/components/map/Legend";
 import { apiFetch } from "@/lib/api";
 import type { Incident } from "@/types";
 
@@ -47,6 +48,16 @@ export default function MapPage() {
       .catch(() => {});
   }, [userLocation]);
 
+  // Group members (demo data — replace with API call later)
+  const members: MemberPin[] = userLocation
+    ? [
+        { name: "Anirudh", lat: userLocation.lat, lng: userLocation.lng, isYou: true },
+        { name: "Ronak", lat: userLocation.lat + 0.008, lng: userLocation.lng - 0.012 },
+        { name: "Kshitij", lat: userLocation.lat - 0.005, lng: userLocation.lng + 0.015 },
+        { name: "Sarah", lat: userLocation.lat + 0.012, lng: userLocation.lng + 0.008 },
+      ]
+    : [];
+
   if (!userLocation) {
     return (
       <div className="h-dvh bg-[#08080d] flex items-center justify-center">
@@ -65,8 +76,11 @@ export default function MapPage() {
         <MapView
           center={userLocation}
           incidents={incidents}
+          members={members}
           onIncidentClick={setSelectedIncident}
         />
+
+        <Legend />
 
         {selectedIncident && (
           <IncidentCard

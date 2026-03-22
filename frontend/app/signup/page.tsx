@@ -129,6 +129,14 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
+
+        {/* Demo shortcut — remove before production */}
+        <Link
+          href="/onboarding"
+          className="block text-center text-xs text-white/15 hover:text-white/30 mt-4 transition-colors"
+        >
+          Skip to demo →
+        </Link>
       </div>
     </div>
   );
