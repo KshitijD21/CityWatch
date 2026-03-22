@@ -32,18 +32,24 @@ cd backend && python -m venv venv && source venv/bin/activate && pip install -r 
 - Backend proxies all database operations through InsForge's REST API (`/api/database/records/{table}`) via `InsForgeClient` in `backend/services/insforge_service.py`
 - Auth: InsForge issues JWT tokens. Backend validates tokens server-side via InsForge's `/api/auth/sessions/current` endpoint in `backend/utils/helpers.py`. User ID is in `payload["sub"]`
 - InsForge auth endpoints: `/api/auth/users` (signup), `/api/auth/sessions` (login), `/api/auth/oauth/{provider}` (OAuth)
-- All backend routes are prefixed with `/api/` — 9 routers: auth, incidents, chat, briefs, reports, groups, places, location, geocode
+- All backend routes are prefixed with `/api/` — 10 routers: auth, incidents, chat, briefs, reports, groups, places, location, geocode, alerts
 - Realtime: InsForge handles all WebSocket infrastructure. Backend has zero WebSocket code — it only receives webhook POSTs from InsForge for DB persistence
 
 ### Completed Backend Features
 
-- **B5 (Auth):** signup, login, profile CRUD, onboarding flag — `backend/routers/auth.py`
-- **B8 (Groups):** create, list, get, join via invite, add/remove members — `backend/routers/groups.py`
+- **B5 (Auth):** signup, login, profile CRUD, onboarding flag, `POST /init` for idempotent profile creation — `backend/routers/auth.py`
+- **B6 (Verification):** AI-powered community report verification via Claude (background task after report submit) — `backend/services/verification_service.py`
+- **B8 (Groups):** create, list, get, join via invite, add/remove members, leave, rename, delete — `backend/routers/groups.py`
 - **B10 (Location):** webhook receiver, location update, get group locations, toggle sharing — `backend/routers/location.py`
   - Uses WebSocket + webhook architecture: frontend publishes GPS via InsForge SDK WebSocket, InsForge broadcasts to subscribers and POSTs to our webhook for DB persistence
   - InsForge realtime channel `group:%:locations` is created with webhook URL
   - See `docs/B10_LOCATION_ARCHITECTURE.md` for full architecture
   - InsForge upsert requires `on_conflict` parameter for tables with unique constraints (e.g., `on_conflict="user_id"` for `locations_live`)
+- **Incidents:** nearby (haversine), in-bounds, stats aggregation, TinyFish scrape trigger — `backend/routers/incidents.py`
+- **Chat:** SSE streaming, two-lane routing, ReAct loop — `backend/routers/chat.py` + `backend/chat/`
+- **Briefs:** AI-generated area safety briefs with caching — `backend/routers/briefs.py`
+- **Reports:** community report submission, nearby reports (RPC), flagging — `backend/routers/reports.py`
+- **Alerts:** recent incidents near user's saved places and live location — `backend/routers/alerts.py`
 
 ### InsForge Integration Rules
 
@@ -61,8 +67,8 @@ cd backend && python -m venv venv && source venv/bin/activate && pip install -r 
 ### Frontend Notes
 
 - Next.js 16 has breaking changes vs prior versions — read `node_modules/next/dist/docs/` before modifying Next.js patterns
-- UI: shadcn/ui components, Mapbox GL for maps
-- InsForge SDK client initialized in `frontend/lib/insforge.ts`
+- UI: shadcn/ui components, MapLibre GL for maps (not Mapbox GL)
+- InsForge SDK: two instances in `frontend/lib/insforge.ts` — `insforge` (direct URL, for realtime WebSocket) and `insforgeAuth` (proxied via Next.js rewrites, for httpOnly cookie auth)
 - API client wrapper in `frontend/lib/api.ts`
 - TypeScript types in `frontend/types/index.ts` mirror backend Pydantic schemas in `backend/models/schemas.py`
 
@@ -92,7 +98,7 @@ After every prompt where you add, change, or remove files, update `refer/progres
 - Chat backend lives in `backend/chat/` (separate module, not in routers/ except the thin router)
 - Two lanes: Lane 1 (simple location queries, cheap model), Lane 2 (people/ReAct, smarter model)
 - Currently using OpenAI (gpt-4o-mini / gpt-4o) — will switch to Claude later
-- Test UI at `frontend/app/test/chat/` — temporary, will be replaced by real chat UI
+- Real chat UI at `frontend/app/chat/page.tsx`; test/sandbox UI at `frontend/app/test/chat/`
 - Card mode is built server-side from real DB data — LLM only generates the summary sentence. LLM NEVER generates card JSON.
 - `_should_show_cards()` in handler.py detects card intent — only explicit phrases like "show incidents", "list incidents". Skips if a person name is in the message.
 - Reverse geocoding via Mapbox converts lat/lng to street names for: incident cards (Lane 1), people locations (Lane 2 ReAct tools), and incident results in ReAct tools
