@@ -126,6 +126,12 @@ def _should_show_cards(message: str, member_names: list[str] | None = None) -> b
         "list crimes", "list reports", "show me crimes",
         "recent incidents", "any incidents", "crimes near",
         "reports near", "show me what happened",
+        "what happened", "what's happening", "whats happening",
+        "any crime", "any reports", "is it safe",
+        "safe to walk", "safe near", "safety near",
+        "how safe", "incidents near", "incidents around",
+        "happened near", "happened around", "happened today",
+        "happened recently", "crime near", "crime around",
     ]
     return any(phrase in msg for phrase in card_phrases)
 
@@ -495,7 +501,6 @@ async def handle_lane2(
 
     # Emit as single text chunk (ReAct isn't streamed token-by-token)
     yield json.dumps({"type": "token", "content": answer})
-    yield json.dumps({"type": "stream_end"})
 
     # Extract person name mentioned for follow-up context
     mentioned_person = None
@@ -542,6 +547,30 @@ async def handle_lane2(
                 resolved_loc_name = await geocoding.reverse_geocode(resolved_lat, resolved_lng)
             except Exception:
                 resolved_loc_name = f"near {session.last_person}"
+
+    # Emit person location card if we have location data for a mentioned person
+    person_name = mentioned_person or session.last_person
+    if person_name and resolved_lat and resolved_lng:
+        # Always reverse geocode for a clean address (don't trust cached/stale values)
+        card_address = resolved_loc_name
+        if not card_address or card_address.replace("-", "").replace(".", "").replace(",", "").replace(" ", "").isdigit():
+            try:
+                card_address = await geocoding.reverse_geocode(resolved_lat, resolved_lng)
+            except Exception:
+                card_address = "Unknown location"
+        yield json.dumps({
+            "type": "person_location",
+            "data": {
+                "name": person_name,
+                "lat": resolved_lat,
+                "lng": resolved_lng,
+                "address": card_address,
+                "updated_ago": prefetched_locations.get(person_name, {}).get("updated_ago", ""),
+                "is_stale": prefetched_locations.get(person_name, {}).get("is_stale", False),
+            }
+        })
+
+    yield json.dumps({"type": "stream_end"})
 
     logger.info(f"[LANE2] saving to session: person={mentioned_person} lat={resolved_lat} lng={resolved_lng} loc={resolved_loc_name}")
 
