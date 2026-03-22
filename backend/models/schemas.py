@@ -37,9 +37,17 @@ class LocationUpdate(BaseModel):
     lat: float
     lng: float
 
+class SharingToggle(BaseModel):
+    group_id: str
+    sharing_location: bool
+
 class GroupCreate(BaseModel):
     name: str
     type: str  # "family" or "friends"
+
+class MemberCreate(BaseModel):
+    display_name: str
+    age_band: Optional[str] = None
 
 class PlaceCreate(BaseModel):
     name: str

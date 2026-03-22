@@ -180,6 +180,7 @@ class InsForgeClient:
         table: str,
         data: dict,
         *,
+        on_conflict: str | None = None,
         token: str | None = None,
     ) -> dict:
         client = await self._get_client()
@@ -187,10 +188,14 @@ class InsForgeClient:
             **self._auth_headers(token),
             "Prefer": "return=representation,resolution=merge-duplicates",
         }
+        params = {}
+        if on_conflict:
+            params["on_conflict"] = on_conflict
         resp = await client.post(
             f"/api/database/records/{table}",
             json=[data],
             headers=headers,
+            params=params,
         )
         if resp.status_code >= 400:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
