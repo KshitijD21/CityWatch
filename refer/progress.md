@@ -1,5 +1,15 @@
 # Progress Log
 
+## 2026-03-22 — Remove DEFAULT_USER_ID Auth Bypass
+
+### Files Changed
+- `backend/config.py` — removed `DEFAULT_USER_ID` env var
+- `backend/utils/helpers.py` — removed `DEFAULT_USER_ID` import and fallback; `get_optional_user()` now returns `None` when no token provided
+- `backend/.env` — removed `DEFAULT_USER_ID` line
+- `backend/.env.example` — removed `DEFAULT_USER_ID` entry
+- `frontend/app/test/chat/page.tsx` — sends JWT token from `localStorage` via `Authorization: Bearer` header
+- `CLAUDE.md` — removed `DEFAULT_USER_ID` from env vars and chat module docs
+
 ## 2026-03-21 — Fix "Latest Incidents" Showing Old Data
 
 ### Files Changed

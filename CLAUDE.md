@@ -74,7 +74,7 @@ Defined in `scripts/schema.sql`. Key tables: users, groups, group_members, saved
 
 Frontend needs: `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
 
-Backend needs: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MAPBOX_TOKEN`, `TINYFISH_API_KEY`, `INSFORGE_URL`, `INSFORGE_API_KEY`, `DEFAULT_USER_ID` (optional, dev/demo auth bypass)
+Backend needs: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MAPBOX_TOKEN`, `TINYFISH_API_KEY`, `INSFORGE_URL`, `INSFORGE_API_KEY`
 
 See `.env.example` for the full template.
 
@@ -96,7 +96,7 @@ After every prompt where you add, change, or remove files, update `refer/progres
 - Card mode is built server-side from real DB data — LLM only generates the summary sentence. LLM NEVER generates card JSON.
 - `_should_show_cards()` in handler.py detects card intent — only explicit phrases like "show incidents", "list incidents". Skips if a person name is in the message.
 - Reverse geocoding via Mapbox converts lat/lng to street names for: incident cards (Lane 1), people locations (Lane 2 ReAct tools), and incident results in ReAct tools
-- `DEFAULT_USER_ID` env var skips auth — `get_optional_user()` falls back to this user ID
+- Chat uses `get_optional_user()` — authenticated users get personalized responses (group members, saved places, profile); unauthenticated users can still query location safety but without personalization
 - Location fallback chain: geocode message → extract location from patterns ("near X", "Is X safe") → session location (for follow-ups) → GPS (only for "near me") → user's live location → saved home → default Phoenix
 - Personal queries ("my name", "who am i", "my group") route to Lane 2 for profile-aware answers
 - `get_user_profile()` in data_access.py fetches user row; injected into both lane prompts as CURRENT USER context

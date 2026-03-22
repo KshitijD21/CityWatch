@@ -11,6 +11,3 @@ X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 INSFORGE_URL = os.getenv("INSFORGE_URL")
 INSFORGE_API_KEY = os.getenv("INSFORGE_API_KEY")
 INSFORGE_JWT_SECRET = os.getenv("INSFORGE_JWT_SECRET")
-
-# Default user ID (for dev/demo — skips auth, always acts as this user)
-DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID")
