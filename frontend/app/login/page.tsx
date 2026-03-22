@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/context/AuthContext";
+import { apiFetch } from "@/lib/api";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/button";
 import { Shield, Loader2 } from "lucide-react";
@@ -24,7 +25,23 @@ export default function LoginPage() {
 
     try {
       const { onboarded } = await login(email, password);
-      router.push(onboarded ? "/map" : "/onboarding");
+      if (onboarded) {
+        router.push("/map");
+      } else {
+        // Check if user already has groups (e.g. joined via invite link)
+        // — skip onboarding and mark as onboarded
+        try {
+          const groups = await apiFetch("/api/groups");
+          if (groups && groups.length > 0) {
+            await apiFetch("/api/auth/me/onboarded", { method: "PUT" });
+            router.push("/map");
+          } else {
+            router.push("/onboarding");
+          }
+        } catch {
+          router.push("/onboarding");
+        }
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Invalid credentials";
