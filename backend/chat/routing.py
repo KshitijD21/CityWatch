@@ -11,6 +11,9 @@ LANE2_KEYWORDS = [
     "where is everyone", "is everyone safe",
     "my name", "who am i", "where do i stay", "where do i live",
     "my profile", "my location", "my home",
+    "group member", "where are they", "where are those",
+    "are they safe", "member safe", "members safe",
+    "locate my", "find my friend", "find my family",
 ]
 
 
@@ -25,9 +28,15 @@ def classify_lane(
     msg_lower = message.lower().strip()
 
     # Check if any group member name appears in the message
+    # Match full name OR first name (e.g. "Anirudh" matches "Anirudh Palaskar")
     if group_member_names:
         for name in group_member_names:
-            if name.lower() in msg_lower:
+            name_lower = name.lower()
+            if name_lower in msg_lower:
+                return 2
+            # Also check first name alone (for multi-word display names)
+            first = name_lower.split()[0] if name_lower else ""
+            if first and len(first) >= 3 and first in msg_lower:
                 return 2
 
     # Check for Lane 2 keywords

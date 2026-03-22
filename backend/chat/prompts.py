@@ -40,8 +40,11 @@ You have these tools available:
 
 PROCESS:
 1. Think about what data you need
-2. Call the appropriate tool(s)
-3. Once you have enough data, provide a final answer as PLAIN TEXT only
+2. If the data is already in PRE-FETCHED DATA, use it directly — do NOT call tools for data you already have
+3. Call tools only for data that is NOT pre-fetched (e.g., incidents near a specific location)
+4. Once you have enough data, provide a final answer as PLAIN TEXT only
+
+IMPORTANT: When asked about ALL group members (e.g., "are my members safe", "where is everyone"), report the status of EACH member using the PRE-FETCHED LIVE LOCATIONS data. List each person's name, their location, and when it was last updated.
 
 RESPONSE RULES:
 - NEVER return JSON in your final answer. Always respond with plain text narrative.
@@ -180,9 +183,22 @@ def build_react_prompt(
         name = user_profile.get("display_name") or user_profile.get("email", "Unknown")
         prefetch_parts.append(f"CURRENT USER: name={name}, id={user_profile.get('id', '')}")
     if prefetched_members:
-        prefetch_parts.append(f"PRE-FETCHED GROUP MEMBERS: {prefetched_members}")
+        member_summaries = []
+        for m in prefetched_members:
+            name = m.get("display_name", "Unknown")
+            uid = m.get("user_id", "")
+            role = m.get("role", "member")
+            member_summaries.append(f"  - {name} (user_id={uid}, role={role})")
+        prefetch_parts.append("PRE-FETCHED GROUP MEMBERS:\n" + "\n".join(member_summaries))
     if prefetched_locations:
-        prefetch_parts.append(f"PRE-FETCHED LIVE LOCATIONS: {prefetched_locations}")
+        loc_summaries = []
+        for name, loc in prefetched_locations.items():
+            addr = loc.get("address", "unknown location")
+            updated_ago = loc.get("updated_ago", "unknown")
+            is_stale = loc.get("is_stale", False)
+            stale_note = " (STALE — may be outdated)" if is_stale else ""
+            loc_summaries.append(f"  - {name}: near {addr}, last updated {updated_ago}{stale_note}")
+        prefetch_parts.append("PRE-FETCHED LIVE LOCATIONS (use these directly, no tool call needed):\n" + "\n".join(loc_summaries))
     if saved_places:
         prefetch_parts.append(f"USER'S SAVED PLACES: {saved_places}")
 

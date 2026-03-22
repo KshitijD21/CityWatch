@@ -95,9 +95,51 @@ export default function BriefPage() {
 
       <div className="px-4 py-6 max-w-lg mx-auto">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="size-6 text-[#4d7fff] animate-spin" />
-            <p className="text-xs text-white/30">Analyzing your area...</p>
+          <div className="space-y-4 animate-pulse">
+            {/* Hero skeleton */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-white/[0.06]" />
+                <div className="flex-1">
+                  <div className="h-4 w-24 bg-white/[0.06] rounded mb-2" />
+                  <div className="h-3 w-36 bg-white/[0.04] rounded" />
+                </div>
+                <div className="h-8 w-12 bg-white/[0.06] rounded" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-full bg-white/[0.04] rounded" />
+                <div className="h-3 w-5/6 bg-white/[0.04] rounded" />
+                <div className="h-3 w-4/6 bg-white/[0.04] rounded" />
+              </div>
+            </div>
+            {/* Category breakdown skeleton */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="h-4 w-36 bg-white/[0.06] rounded mb-4" />
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.06]" />
+                    <div className="flex-1">
+                      <div className="h-3 w-20 bg-white/[0.05] rounded mb-1.5" />
+                      <div className="h-1.5 w-full bg-white/[0.04] rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Time of day skeleton */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="h-4 w-28 bg-white/[0.06] rounded mb-4" />
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-center">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.06] mx-auto mb-2" />
+                    <div className="h-5 w-8 bg-white/[0.06] rounded mx-auto mb-1" />
+                    <div className="h-2.5 w-12 bg-white/[0.04] rounded mx-auto" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : brief ? (
           <div className="space-y-4">

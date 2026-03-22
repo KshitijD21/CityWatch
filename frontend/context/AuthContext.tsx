@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore session on mount + refresh token via InsForge
+  // Restore session on mount from localStorage
   useEffect(() => {
     async function restoreSession() {
       // Try to refresh the token via InsForge httpOnly cookie
@@ -69,10 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, loading: false }));
       }
     }
-    restoreSession();
   }, [fetchUser]);
 
-  // Auto-refresh token every 10 minutes + on tab focus to keep session alive
+  // Keep session alive — re-validate token on tab focus
   useEffect(() => {
     async function refreshToken() {
       const { data } = await insforge.auth.refreshSession().catch(() => ({ data: null }));

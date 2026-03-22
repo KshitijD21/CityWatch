@@ -18,7 +18,7 @@ def _message_explicitly_requests_user_location(message: str) -> bool:
     msg = message.lower()
     return any(phrase in msg for phrase in [
         "near me", "around me", "my area", "my location",
-        "where i am", "my neighborhood", "close to me",
+        "where i am", "where am i", "my neighborhood", "close to me",
     ])
 
 
@@ -38,11 +38,21 @@ async def _extract_location(
     Priority for explicit location requests:
       geocode message → GPS (if "near me") → session → DB → saved → default
     """
+    # If user is asking about their own location ("Where am I?"), skip geocoding
+    # and fall through to GPS / live location
+    msg_lower = message.lower().strip().rstrip("?!.")
+    self_location_phrases = [
+        "where am i", "where i am", "my location", "am i safe",
+        "what's near me", "whats near me",
+    ]
+    is_self_query = any(phrase in msg_lower for phrase in self_location_phrases)
+
     # Try geocoding the message text — first try the raw message,
     # then extract location phrases if the raw message fails
-    geo = await geocoding.geocode_location(message)
-    if geo:
-        return geo["lat"], geo["lng"], geo["place_name"]
+    if not is_self_query:
+        geo = await geocoding.geocode_location(message)
+        if geo:
+            return geo["lat"], geo["lng"], geo["place_name"]
 
     # Try extracting location from common patterns
     import re
@@ -116,7 +126,11 @@ def _should_show_cards(message: str, member_names: list[str] | None = None) -> b
     # If a person's name is mentioned, use text mode
     if member_names:
         for name in member_names:
-            if name.lower() in msg:
+            name_lower = name.lower()
+            if name_lower in msg:
+                return False
+            first = name_lower.split()[0] if name_lower else ""
+            if first and len(first) >= 3 and first in msg:
                 return False
     # Card triggers — queries specifically about incidents, safety conditions, or locations
     card_phrases = [
@@ -147,8 +161,8 @@ def _extract_days_from_message(message: str) -> int | None:
     import re
     msg = message.lower()
 
-    # "last N hours/hr/h"
-    match = re.search(r'last\s+(\d+)\s*(?:hours?|hrs?|h)\b', msg)
+    # "last N hours/hr/h" or "past N hours/hr/h"
+    match = re.search(r'(?:last|past)\s+(\d+)\s*(?:hours?|hrs?|h)\b', msg)
     if match:
         n = int(match.group(1))
         # Return fractional days — but since DB queries use integer days,
@@ -308,6 +322,22 @@ async def handle_lane1(
         days = session_state.last_days
     else:
         days = 7
+    # Reverse geocode to get a precise address when location_name is
+    # generic ("your current location") or raw coords ("33.4308, -111.9359")
+    import re as _re
+    needs_geocode = (
+        location_name in ("your current location", "your live location", "previous location")
+        or (location_name and _re.match(r'^-?\d+\.\d+,\s*-?\d+\.\d+$', location_name))
+        or not location_name
+    )
+    if needs_geocode and lat and lng:
+        try:
+            precise_name = await geocoding.reverse_geocode(lat, lng)
+            if precise_name and not _re.match(r'^-?\d+\.\d+,\s*-?\d+\.\d+$', precise_name):
+                location_name = precise_name
+        except Exception:
+            pass
+
     logger.info(f"[LANE1] lat={lat} lng={lng} loc={location_name} radius={radius}mi days={days} (requested_radius={requested_radius} requested_days={requested_days})")
 
     # Fetch data
@@ -361,7 +391,7 @@ async def handle_lane1(
             "content": (
                 f"The user asked: \"{message}\"\n"
                 f"There are {len(incidents)} incidents near {location_name or 'this location'} "
-                f"in the last 30 days. Write a ONE-SENTENCE summary for a card header. "
+                f"in the last {days} day{'s' if days != 1 else ''}. Write a ONE-SENTENCE summary for a card header. "
                 f"Do NOT return JSON. Just the summary sentence."
             ),
         }
@@ -452,7 +482,8 @@ async def handle_lane2(
         except Exception:
             pass
 
-        # Pre-fetch live locations for all members
+        # Pre-fetch live locations for all members and enrich with address + relative time
+        from datetime import datetime as _dt, timezone as _tz
         for member in prefetched_members:
             member_uid = member.get("user_id")
             if member_uid:
@@ -460,6 +491,34 @@ async def handle_lane2(
                     loc = await data_access.get_live_location(member_uid)
                     if loc:
                         name = member.get("display_name", member_uid)
+                        # Reverse geocode for human-readable address
+                        if loc.get("lat") and loc.get("lng"):
+                            try:
+                                addr = await geocoding.reverse_geocode(loc["lat"], loc["lng"])
+                                loc["address"] = addr
+                            except Exception:
+                                loc["address"] = f"{loc['lat']:.4f}, {loc['lng']:.4f}"
+                        # Compute relative time + staleness
+                        updated = loc.get("updated_at", "")
+                        if updated:
+                            try:
+                                dt = _dt.fromisoformat(updated.replace("Z", "+00:00"))
+                                delta = _dt.now(_tz.utc) - dt
+                                minutes = int(delta.total_seconds() / 60)
+                                loc["is_stale"] = minutes > 5
+                                if minutes < 1:
+                                    loc["updated_ago"] = "just now"
+                                elif minutes < 60:
+                                    loc["updated_ago"] = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+                                elif minutes < 1440:
+                                    hours = minutes // 60
+                                    loc["updated_ago"] = f"{hours} hour{'s' if hours != 1 else ''} ago"
+                                else:
+                                    days_ago = minutes // 1440
+                                    loc["updated_ago"] = f"{days_ago} day{'s' if days_ago != 1 else ''} ago"
+                            except Exception:
+                                loc["updated_ago"] = "unknown"
+                                loc["is_stale"] = True
                         prefetched_locations[name] = loc
                 except Exception:
                     pass
@@ -502,7 +561,15 @@ async def handle_lane2(
         msg_lower = message.lower()
         for member in prefetched_members:
             name = member.get("display_name", "")
-            if name and name.lower() in msg_lower:
+            if not name:
+                continue
+            name_lower = name.lower()
+            if name_lower in msg_lower:
+                mentioned_person = name
+                break
+            # Also match first name (e.g. "Anirudh" matches "Anirudh Palaskar")
+            first = name_lower.split()[0] if name_lower else ""
+            if first and len(first) >= 3 and first in msg_lower:
                 mentioned_person = name
                 break
 
