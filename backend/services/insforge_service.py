@@ -106,12 +106,18 @@ class InsForgeClient:
         *,
         select: str = "*",
         filters: dict | None = None,
+        order: str | None = None,
+        limit: int | None = None,
         token: str | None = None,
         single: bool = False,
     ) -> list | dict:
         client = await self._get_client()
         params: dict[str, str] = {"select": select}
         params.update(self._build_filters(filters))
+        if order:
+            params["order"] = order
+        if limit is not None:
+            params["limit"] = str(limit)
         headers = self._auth_headers(token)
         if single:
             headers["Accept"] = "application/vnd.pgrst.object+json"
