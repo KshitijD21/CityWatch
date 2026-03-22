@@ -134,16 +134,32 @@ export function MapView({ center, incidents, members, onIncidentClick }: MapView
 
     incidents.forEach((incident) => {
       const color = CATEGORY_COLORS[incident.category] || "#6b7280";
+      const isCommunity = incident.source === "community";
       const el = document.createElement("div");
-      el.style.cssText = `
-        width: 10px;
-        height: 10px;
-        background: ${color};
-        border: 1.5px solid rgba(0,0,0,0.4);
-        border-radius: 50%;
-        cursor: pointer;
-        box-shadow: 0 0 6px ${color}50;
-      `;
+
+      if (isCommunity) {
+        // Diamond shape for community reports
+        el.style.cssText = `
+          width: 12px;
+          height: 12px;
+          background: ${color};
+          border: 2px solid rgba(255,255,255,0.3);
+          transform: rotate(45deg);
+          cursor: pointer;
+          box-shadow: 0 0 8px ${color}60;
+        `;
+      } else {
+        // Circle for police/news
+        el.style.cssText = `
+          width: 10px;
+          height: 10px;
+          background: ${color};
+          border: 1.5px solid rgba(0,0,0,0.4);
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 0 6px ${color}50;
+        `;
+      }
 
       el.addEventListener("click", () => {
         onIncidentClick(incident);

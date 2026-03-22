@@ -16,6 +16,11 @@ export default function MapPage() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
+  const [sourceFilters, setSourceFilters] = useState<Record<string, boolean>>({
+    police: true,
+    news: true,
+    community: true,
+  });
 
   // Get user's first group
   useEffect(() => {
@@ -67,6 +72,12 @@ export default function MapPage() {
       .catch(() => {});
   }, [userLocation]);
 
+  const filteredIncidents = incidents.filter((inc) => sourceFilters[inc.source] !== false);
+
+  function toggleSource(source: string) {
+    setSourceFilters((prev) => ({ ...prev, [source]: !prev[source] }));
+  }
+
   // Show real members, always include "You" pin
   const members: MemberPin[] = userLocation
     ? [
@@ -86,7 +97,7 @@ export default function MapPage() {
   return (
     <div className="h-dvh w-full flex bg-[#08080d]">
       <Sidebar
-        incidentCount={incidents.length}
+        incidentCount={filteredIncidents.length}
         sharing={sharing}
         onToggleSharing={() => {
           if (sharing && groupId) {
@@ -100,12 +111,15 @@ export default function MapPage() {
       <div className="flex-1 relative">
         <MapView
           center={userLocation}
-          incidents={incidents}
+          incidents={filteredIncidents}
           members={members}
           onIncidentClick={setSelectedIncident}
         />
 
-        <Legend />
+        <Legend
+          sourceFilters={sourceFilters}
+          onToggleSource={toggleSource}
+        />
 
         {selectedIncident && (
           <IncidentCard
