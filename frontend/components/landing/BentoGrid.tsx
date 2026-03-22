@@ -62,7 +62,7 @@ export function BentoGrid() {
                 <h3 className="text-sm sm:text-base font-semibold text-white/90 mb-1.5">
                   {feature.title}
                 </h3>
-                <p className="text-sm text-white/35 leading-relaxed font-light">
+                <p className="text-sm text-white/60 leading-relaxed font-light">
                   {feature.description}
                 </p>
               </div>
@@ -110,7 +110,7 @@ export function BentoGrid() {
                 <h3 className="text-base font-semibold text-white mb-2">
                   {item.title}
                 </h3>
-                <p className="text-sm text-white/40 font-light leading-relaxed">
+                <p className="text-sm text-white/60 font-light leading-relaxed">
                   {item.description}
                 </p>
               </FadeIn>
@@ -125,7 +125,7 @@ export function BentoGrid() {
             <h2 className="relative text-2xl sm:text-3xl font-[family-name:var(--font-heading)] text-white mb-4">
               Safety shouldn&apos;t require fear
             </h2>
-            <p className="relative text-white/40 max-w-md mx-auto mb-8 text-sm sm:text-base font-light leading-relaxed">
+            <p className="relative text-white/60 max-w-md mx-auto mb-8 text-sm sm:text-base font-light leading-relaxed">
               CityWatch is built on a simple belief: awareness is empowering, not
               alarming. Know more, worry less.
             </p>
