@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Send, Loader2, Shield } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,7 +21,21 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Get user location on mount
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {
+        // Default to Tempe/ASU
+        setUserCoords({ lat: 33.4255, lng: -111.94 });
+      },
+      { timeout: 5000 }
+    );
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
@@ -34,23 +49,123 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      const res = await apiFetch("/api/chat", {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
+        headers,
         body: JSON.stringify({
           message: text.trim(),
-          history: messages.slice(-10),
+          user_lat: userCoords?.lat,
+          user_lng: userCoords?.lng,
+          session_id: sessionId,
         }),
       });
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: res.response || res.message || "I couldn't process that request." },
-      ]);
+
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let assistantContent = "";
+
+      // Add empty assistant message that we'll stream into
+      setMessages((m) => [...m, { role: "assistant", content: "" }]);
+      setLoading(false);
+
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep the last potentially incomplete line in the buffer
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === "session") {
+              setSessionId(event.session_id);
+            } else if (event.type === "token") {
+              assistantContent += event.content;
+              setMessages((m) => {
+                const updated = [...m];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: assistantContent,
+                };
+                return updated;
+              });
+            } else if (event.type === "cards") {
+              // Format card data as readable text
+              const cardData = event.data;
+              let cardText = cardData.summary || "";
+              if (cardData.incidents?.length) {
+                cardText += "\n\n";
+                for (const inc of cardData.incidents) {
+                  cardText += `• ${inc.category}: ${inc.description || "No description"}`;
+                  if (inc.distance_miles != null) {
+                    cardText += ` (${inc.distance_miles.toFixed(1)} mi away)`;
+                  }
+                  cardText += "\n";
+                }
+              }
+              assistantContent = cardText.trim();
+              setMessages((m) => {
+                const updated = [...m];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: assistantContent,
+                };
+                return updated;
+              });
+            } else if (event.type === "error") {
+              assistantContent = event.content || "Something went wrong.";
+              setMessages((m) => {
+                const updated = [...m];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: assistantContent,
+                };
+                return updated;
+              });
+            }
+          } catch {
+            // Skip malformed JSON lines
+          }
+        }
+      }
+
+      // If we never got any content, show a fallback
+      if (!assistantContent) {
+        setMessages((m) => {
+          const updated = [...m];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: "I couldn't process that request. Please try again.",
+          };
+          return updated;
+        });
+      }
     } catch {
       setMessages((m) => [
         ...m,
         { role: "assistant", content: "Sorry, I'm having trouble connecting. Please try again." },
       ]);
-    } finally {
       setLoading(false);
     }
   }
@@ -104,7 +219,7 @@ export default function ChatPage() {
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === "user"
                   ? "bg-[#4d7fff] text-white"
                   : "bg-white/[0.05] text-white/70 border border-white/[0.06]"
