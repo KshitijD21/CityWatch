@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, BackgroundTasks, Query
 from services.insforge_service import insforge
 import math
 
@@ -17,6 +17,22 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
         * math.sin(dlng / 2) ** 2
     )
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+@router.post("/scrape")
+async def trigger_scrape(
+    background_tasks: BackgroundTasks,
+    hours: int = Query(default=24, ge=1, le=168),
+):
+    """Trigger a TinyFish scrape in the background.
+
+    Args:
+        hours: scrape incidents from the last N hours (default 24, max 168/7 days)
+    """
+    from services.tinyfish_service import scrape_all
+
+    background_tasks.add_task(scrape_all, since_hours=hours)
+    return {"status": "started", "hours": hours}
 
 
 @router.get("/nearby")

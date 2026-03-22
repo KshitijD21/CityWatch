@@ -23,6 +23,7 @@ openai>=1.40.0
 jiter==0.13.0
 markdown-it-py==4.0.0
 mdurl==0.1.2
+openai==2.29.0
 mmh3==5.2.1
 multidict==6.7.1
 packaging==26.0
@@ -47,6 +48,7 @@ starlette==0.52.1
 StrEnum==0.4.15
 strictyaml==1.7.3
 tenacity==9.1.4
+tinyfish==0.2.4
 tweepy==4.14.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0

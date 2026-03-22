@@ -16,3 +16,4 @@ build/
 # Downloaded data files (large CSVs)
 backend/scripts/data/
 scripts/data/
+*.csv
