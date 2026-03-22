@@ -85,11 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 1. Token exists and is still valid — use it directly, no network call needed
       if (saved && !isTokenExpired(saved)) {
+        console.log('[Auth] Token valid, skipping refreshSession');
         await fetchUser(saved);
         return;
       }
 
       // 2. Token expired or missing — try refresh via httpOnly cookie (7-day lifetime)
+      console.log('[Auth] Token expired/missing, calling refreshSession');
       const { data } = await insforge.auth
         .refreshSession()
         .catch(() => ({ data: null }));
