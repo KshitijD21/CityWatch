@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MapView, type MemberPin } from '@/components/map/MapView';
 import { Sidebar } from '@/components/map/Sidebar';
@@ -16,6 +16,20 @@ import { apiFetch } from '@/lib/api';
 import type { Incident } from '@/types';
 
 export default function MapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-dvh bg-[#08080d] flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#4d7fff] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <MapPageContent />
+    </Suspense>
+  );
+}
+
+function MapPageContent() {
   const { user } = useAuthContext();
   const searchParams = useSearchParams();
   const focusUserId = searchParams.get('focus');
