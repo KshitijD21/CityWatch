@@ -99,6 +99,11 @@ class UserProfile(BaseModel):
     saved_places: list
 
 
+class InitProfileRequest(BaseModel):
+    name: str
+    age_band: str = "adult"
+
+
 class UserUpdateRequest(BaseModel):
     name: Optional[str] = None
     age_band: Optional[str] = None

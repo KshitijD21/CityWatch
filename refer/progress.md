@@ -1,5 +1,23 @@
 # Progress Log
 
+## 2026-03-22 — SDK-First Auth + Refresh Token Fix
+
+### Files Added
+
+- `backend/routers/auth.py::init_profile` — new `POST /api/auth/init` endpoint: creates `users` table row if not exists (idempotent), used after SDK signup/first login
+
+### Files Changed
+
+- `backend/models/schemas.py` — added `InitProfileRequest(name, age_band)` model
+- `backend/routers/auth.py::get_me` — wrapped `users` query in try/except, returns 404 if user profile row doesn't exist yet
+- `backend/services/insforge_service.py` — removed debug logging and `_extract_refresh_token` helper (no longer needed)
+- `frontend/context/AuthContext.tsx` — full rewrite to SDK-first auth:
+  - `login()`: SDK `signInWithPassword()` → sets httpOnly refresh cookie → backend `/api/auth/me` for profile (auto-creates via `/api/auth/init` on first login)
+  - `signup()`: SDK `signUp()` → backend `/api/auth/init` to create user row → `fetchUser()`
+  - `restoreSession()`: SDK `refreshSession()` (no args, uses httpOnly cookie) → falls back to localStorage token for dev
+  - Token refresh: 10-min interval + tab focus via SDK `refreshSession()`
+  - `logout()`: clears localStorage + SDK `signOut()` clears cookie
+
 ## 2026-03-22 — Token Auto-Refresh + WebSocket Location Auto-Publish
 
 ### Files Changed
