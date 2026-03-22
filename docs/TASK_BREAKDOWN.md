@@ -31,6 +31,13 @@ Render each member as a named dot (different from event pins).
 Fetch incidents near each member (0.25 mile radius).
 Show those pins around the member's dot.
 
+**Backend ready (B10):** Location sharing endpoints are complete. See below for integration:
+- Initial load: `GET /api/location/group/{groupId}` → returns `[{ user_id, display_name, lat, lng, updated_at, is_stale }]`
+- Real-time updates: subscribe to `group:${groupId}:locations` via InsForge SDK, listen for `location_update` events
+- Send own GPS: `insforge.realtime.publish(...)` every 3-5 sec
+- Stale dots (`is_stale: true`): gray out with "Last seen X min ago"
+- See `docs/B10_LOCATION_ARCHITECTURE.md` for full flow
+
 Search bar at the top: type any address or place name.
 On search, geocode the address and fly the map there.
 
@@ -190,6 +197,14 @@ On successful login/signup:
 If user.onboarded is false → go to onboarding
 If user.onboarded is true → go back to map with group features active
 
+**Backend ready (B5):** Auth endpoints are complete.
+- Signup: `POST /api/auth/signup` → `{ email, password, name, age_band }` → returns `{ user_id, token, onboarded }`
+- Login: `POST /api/auth/login` → `{ email, password }` or `{ google_token }` → returns `{ user_id, token, onboarded }`
+- Profile: `GET /api/auth/me` (with Bearer token) → returns full user profile
+- Update: `PUT /api/auth/me` → `{ name, age_band, notification_prefs }`
+- Onboarded: `PUT /api/auth/me/onboarded` → sets `onboarded = true`
+- Store token from login/signup response, pass as `Authorization: Bearer <token>` on all authenticated requests
+
 ## F7. ONBOARDING (Only after first signup)
 
 Step 1 — Ethical modal
@@ -223,6 +238,12 @@ On complete:
 Call backend to set user.onboarded = true
 Redirect to map with group features now active
 
+**Backend ready (B5 + B8):** All endpoints needed for onboarding are complete.
+- Step 2: `POST /api/groups` → `{ name, type }` → returns `{ group_id, invite_code }`
+- Step 3: `POST /api/groups/{group_id}/members` → `{ display_name, age_band }` → adds placeholder member
+- Step 4: Saved places endpoints (B9) — not yet implemented
+- On complete: `PUT /api/auth/me/onboarded` → sets `onboarded = true`
+
 ## F8. GROUP MANAGEMENT PAGE (Signed-in only)
 
 Accessible from a menu or profile icon.
@@ -239,11 +260,11 @@ Name
 Age band
 Sharing status (green dot = sharing, gray = not sharing)
 If the member is a placeholder (hasn't joined yet):
-Show "Invite pending" tag
+Show "Invite pending" tag (placeholder = `user_id` is `null`)
 
 Your own sharing toggle:
 Switch to turn your location sharing on/off for this group.
-When you turn it on: browser starts sending GPS to backend.
+When you turn it on: browser starts sending GPS via WebSocket.
 When you turn it off: GPS stops, your dot disappears for others.
 
 "Invite" button:
@@ -253,6 +274,17 @@ Copy to clipboard
 "Create new group" button:
 Opens a small form: name + type
 Creates group and shows it in the list
+
+**Backend ready (B8 + B10):** All endpoints needed for this page are complete.
+- List groups: `GET /api/groups` → returns groups with role
+- Group details: `GET /api/groups/{id}` → returns group + members list (each member has `sharing_location` boolean)
+- Create group: `POST /api/groups` → `{ name, type }` → returns `{ group_id, invite_code }`
+- Add member: `POST /api/groups/{id}/members` → `{ display_name, age_band }`
+- Remove member: `DELETE /api/groups/{id}/members/{member_id}`
+- Toggle sharing: `PUT /api/location/sharing` → `{ group_id, sharing_location }` (per-user, per-group toggle)
+- When sharing is ON: publish GPS via `insforge.realtime.publish(\`group:${groupId}:locations\`, 'location_update', { user_id, display_name, lat, lng })` every 3-5 sec
+- When sharing is OFF: stop publishing, backend deletes location from DB so dot disappears immediately
+- Invite code is in `invite_code` field from group details
 
 ## F9. JOIN GROUP PAGE
 
@@ -265,6 +297,11 @@ After auth, auto-join the group.
 If signed in:
 Show: "Join [group name]?" with confirm button.
 On confirm, add user to group and redirect to map.
+
+**Backend ready (B8):** Join endpoint is complete.
+- Join: `GET /api/groups/join/{invite_code}` → returns `{ group_id, group_name }`
+- If user's name matches a placeholder member, they get linked automatically
+- If already a member, returns `{ message: "Already a member" }`
 
 =========================================================
 BACKEND
@@ -426,7 +463,9 @@ Headers: Authorization (required)
 Logic: increment flagged_by_users count on the report.
 If flagged_by_users >= 3, auto-change status to "flagged."
 
-## B5. (Ronak) AUTH AND USER ENDPOINTS (Auth Required)
+## B5. (Ronak) AUTH AND USER ENDPOINTS (Auth Required) ✅ COMPLETE
+
+**Status: All 5 endpoints implemented and tested.**
 
 POST /api/auth/signup
 Body: { email, password, name, age_band }
@@ -448,6 +487,12 @@ Updates user profile.
 
 PUT /api/auth/me/onboarded
 Sets onboarded = true after completing onboarding.
+
+**Frontend integration notes:**
+- Auth tokens are JWT, pass as `Authorization: Bearer <token>`
+- Token validated server-side via InsForge (no client-side JWT verification needed)
+- `user_id` is in the token payload as `sub`
+- Supports both email/password and Google OAuth login
 
 ## B6. AI VERIFICATION (Background Task — Not An Endpoint)
 
@@ -516,7 +561,9 @@ Step 4: Broadcast via realtime. ← WEBHOOK/REALTIME
 Push "community_signal" event so the map shows the
 clustered pin with count badge.
 
-## B8. (Ronak) GROUP ENDPOINTS (Auth Required)
+## B8. (Ronak) GROUP ENDPOINTS (Auth Required) ✅ COMPLETE
+
+**Status: All 6 endpoints implemented and tested.**
 
 POST /api/groups
 Body: { name, type }
@@ -546,6 +593,12 @@ Adds a placeholder member (no user_id yet).
 DELETE /api/groups/:id/members/:member_id
 Removes a member from the group.
 
+**Frontend integration notes:**
+- Invite codes are 6-char uppercase alphanumeric (e.g. `Q7UJYW`)
+- Placeholder members have `user_id: null` — they get linked when joining via invite code if display_name matches
+- `sharing_location` defaults to `false` for new members
+- Group type is `"family"` or `"friends"`
+
 ## B9. (Ronak) SAVED PLACES ENDPOINTS (Auth Required)
 
 POST /api/places
@@ -561,37 +614,51 @@ Returns all saved places for current user.
 DELETE /api/places/:id
 Removes a saved place.
 
-## B10. (Ronak) LOCATION ENDPOINTS (Auth Required)
+## B10. (Ronak) LOCATION ENDPOINTS (Auth Required) ✅ COMPLETE
 
-POST /api/location/update ← WEBHOOK/REALTIME
+**Status: All 4 endpoints implemented and tested. InsForge realtime channel created.**
+
+**Architecture: WebSocket Publish + Webhook Persistence**
+- Frontend sends GPS via WebSocket (`REALTIME_PUBLISH` to `group:{id}:locations`)
+- InsForge broadcasts to all subscribers instantly AND POSTs to our webhook
+- Webhook endpoint persists location to DB
+- REST fallback endpoint available if WebSocket is unavailable
+- See `docs/B10_LOCATION_ARCHITECTURE.md` for full architecture details
+
+POST /api/location/webhook ← Called by InsForge, NOT by frontend
+Receives realtime webhook payload, upserts to `locations_live`.
+No auth required (called server-to-server by InsForge).
+
+POST /api/location/update ← Fallback REST endpoint
 Body: { lat, lng }
 Headers: Authorization
-
-Logic:
-Step 1: Upsert into locations_live table.
-INSERT ... ON CONFLICT (user_id) UPDATE SET lat, lng, updated_at.
-
-    Step 2: Find all groups this user belongs to where
-      sharing_location = true.
-
-    Step 3: For each group, broadcast to realtime channel:
-      Channel: "group:{group_id}:locations"
-      Payload: { user_id, name, lat, lng, updated_at }
-
-The frontend calls this every 3-5 seconds when sharing is on.
+Upserts into `locations_live`. Use only if WebSocket is unavailable.
 
 GET /api/location/group/:group_id
-Returns latest location for all members of this group
-who have sharing_location = true.
-Pulls from locations_live table.
-Includes: user_id, name, lat, lng, updated_at, is_stale
-(is_stale = true if updated_at > 5 minutes ago)
+Headers: Authorization
+Returns latest location for all members with `sharing_location = true`.
+Includes: user_id, display_name, lat, lng, updated_at, is_stale
+(`is_stale = true` if `updated_at` > 5 minutes ago — user may have lost connection)
 
-PUT /api/groups/:id/sharing
-Body: { sharing_location: true/false }
-Toggles the current user's sharing status in group_members.
-If turning OFF: remove their row from locations_live.
-Broadcast to group that this member stopped/started sharing.
+PUT /api/location/sharing
+Body: { group_id, sharing_location }
+Headers: Authorization
+Toggles the current user's sharing per group (individual toggle, not group-wide).
+If turning OFF: deletes user's row from `locations_live` so dot disappears immediately.
+
+**InsForge Realtime Setup (already done):**
+- Channel pattern: `group:%:locations` (% = wildcard for group_id)
+- Webhook URL: points to `POST /api/location/webhook`
+- When deploying: update webhook URL via `PUT /api/realtime/channels/{id}`
+
+**Frontend integration notes:**
+- On initial map load: `GET /api/location/group/{groupId}` for current positions
+- Then connect WebSocket: `insforge.realtime.subscribe(\`group:${groupId}:locations\`)`
+- Listen for `location_update` events to move dots in real-time
+- Send own GPS every 3-5 sec: `insforge.realtime.publish(\`group:${groupId}:locations\`, 'location_update', { user_id, display_name, lat, lng })`
+- Use `PUT /api/location/sharing` to toggle sharing on/off per group
+- Stale dots (>5 min) should be grayed out with "Last seen X min ago"
+- Disconnect vs toggle off: disconnect → dot grays out after 5 min; toggle off → dot disappears immediately
 
 ## B11. (Ronak)GEOCODING ENDPOINT (No Auth — Utility)
 
@@ -613,12 +680,16 @@ REALTIME CHANNELS (WebSocket / InsForge Realtime)
 These are NOT REST endpoints. They are persistent connections
 that push data to connected frontends in real time.
 
-CHANNEL 1: "group:{group_id}:locations"
+CHANNEL 1: "group:{group_id}:locations" ✅ CREATED ON INSFORGE
 Purpose: Live location dots on the map.
-Triggered by: B10 (location update endpoint)
-Payload: { user_id, name, lat, lng, updated_at }
-Who subscribes: All signed-in members of this group.
+Channel pattern registered: `group:%:locations` (% = wildcard)
+Triggered by: Frontend publishes via InsForge SDK (`insforge.realtime.publish(...)`)
+Payload: { user_id, display_name, lat, lng }
+Event name: `location_update`
+Who subscribes: All signed-in members of this group (each frontend subscribes on map load).
 Frontend action: Move the member's dot on the map.
+Webhook: InsForge POSTs to `POST /api/location/webhook` → backend persists to DB.
+InsForge doesn't know about group members — it just broadcasts to whoever subscribed to the channel string.
 
 CHANNEL 2: "area:{lat_rounded}:{lng_rounded}:events"
 Purpose: New event pins appearing on the map.
